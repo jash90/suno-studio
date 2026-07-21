@@ -771,6 +771,7 @@ export default function LibraryView({
         const isCollapsed = section.name !== null && collapsed.has(section.name);
         const busyKey = albumBusy?.startsWith(`${section.name}:`) ? albumBusy : null;
         const mode = section.name ? albumMode[section.name] ?? "both" : "both";
+        const hasAiCovers = section.tracks.some((t) => t.aiImagePath);
         return (
           <section key={section.name ?? "__singles__"} className="album-group">
             <div className="album-group-header">
@@ -792,135 +793,104 @@ export default function LibraryView({
               </span>
               {section.name && (
                 <span className="album-group-actions">
-                  {playback?.name === section.name ? (
-                    <button onClick={onStopPlayback}>
-                      <Square size={13} /> Zatrzymaj
-                    </button>
-                  ) : (
-                    <button
-                      disabled={buildQueue(section.tracks, mode).length === 0}
-                      onClick={() =>
-                        onPlay({
-                          name: section.name!,
-                          queue: buildQueue(section.tracks, mode),
-                          index: 0,
-                          repeat: false,
-                        })
-                      }
-                    >
-                      <Play size={13} /> Odtwórz album
-                    </button>
-                  )}
+                  <span className="action-group">
+                    {playback?.name === section.name ? (
+                      <button onClick={onStopPlayback}>
+                        <Square size={13} /> Zatrzymaj
+                      </button>
+                    ) : (
+                      <button
+                        disabled={buildQueue(section.tracks, mode).length === 0}
+                        onClick={() =>
+                          onPlay({
+                            name: section.name!,
+                            queue: buildQueue(section.tracks, mode),
+                            index: 0,
+                            repeat: false,
+                          })
+                        }
+                      >
+                        <Play size={13} /> Odtwórz album
+                      </button>
+                    )}
+                  </span>
+
                   <span
-                    className="variant-switch"
+                    className="action-group"
                     title="Które warianty trafiają do kolejki i pobierania"
                   >
-                    {(["a", "b", "both"] as const).map((m) => (
-                      <button
-                        key={m}
-                        className={mode === m ? "active" : ""}
-                        onClick={() => setAlbumMode({ ...albumMode, [section.name!]: m })}
-                      >
-                        {m === "both" ? "A+B" : m.toUpperCase()}
-                      </button>
-                    ))}
-                  </span>
-                  <button
-                    disabled={albumBusy !== null}
-                    onClick={() => downloadAlbum(section.name!, section.tracks, "mp3", mode)}
-                  >
-                    {busyKey === `${section.name}:mp3` ? (
-                      <Loader2 size={13} className="spin" />
-                    ) : (
-                      <Download size={13} />
-                    )}{" "}
-                    MP3
-                  </button>
-                  <button
-                    disabled={albumBusy !== null}
-                    onClick={() => downloadAlbum(section.name!, section.tracks, "wav", mode)}
-                  >
-                    {busyKey === `${section.name}:wav` ? (
-                      <Loader2 size={13} className="spin" />
-                    ) : (
-                      <FileAudio size={13} />
-                    )}{" "}
-                    WAV
-                  </button>
-                  <button
-                    disabled={albumBusy !== null}
-                    onClick={() => downloadAlbumCovers(section.name!, section.tracks)}
-                  >
-                    {busyKey === `${section.name}:covers` ? (
-                      <Loader2 size={13} className="spin" />
-                    ) : (
-                      <ImageDown size={13} />
-                    )}{" "}
-                    Okładki
-                  </button>
-                  <button
-                    disabled={albumBusy !== null}
-                    onClick={() => downloadAlbumLyrics(section.name!, section.tracks)}
-                  >
-                    <FileText size={13} /> Teksty
-                  </button>
-                  <button
-                    disabled={albumBusy !== null}
-                    onClick={async () => {
-                      setMessage(null);
-                      setAlbumBusy(`${section.name}:aicover`);
-                      try {
-                        await onGenerateAlbumCovers(section.name!, (done, total) =>
-                          setMessage(
-                            `Generowanie okładek AI: ${done}/${total} — album „${section.name}”`
-                          )
-                        );
-                        setMessage(`Wygenerowano brakujące okładki AI albumu „${section.name}”`);
-                      } catch (e) {
-                        setMessage(e instanceof Error ? e.message : String(e));
-                      } finally {
-                        setAlbumBusy(null);
-                      }
-                    }}
-                  >
-                    {busyKey === `${section.name}:aicover` ? (
-                      <Loader2 size={13} className="spin" />
-                    ) : (
-                      <Sparkles size={13} />
-                    )}{" "}
-                    Okładki AI
-                  </button>
-                  {section.tracks.some((t) => t.aiImagePath) && (
-                    <span className="variant-switch" title="Która okładka albumu jest aktywna">
-                      {(["suno", "ai"] as const).map((m) => (
+                    <span className="action-group-label">Warianty</span>
+                    <span className="variant-switch">
+                      {(["a", "b", "both"] as const).map((m) => (
                         <button
                           key={m}
-                          className={(section.tracks[0]?.coverSource ?? "suno") === m ? "active" : ""}
-                          onClick={() =>
-                            onSetCoverSource(section.tracks.map((t) => t.id), m)
-                          }
+                          className={mode === m ? "active" : ""}
+                          onClick={() => setAlbumMode({ ...albumMode, [section.name!]: m })}
                         >
-                          {m === "ai" ? "AI" : "Suno"}
+                          {m === "both" ? "A+B" : m.toUpperCase()}
                         </button>
                       ))}
                     </span>
-                  )}
-                  {section.tracks.some((t) => t.aiImagePath) && (
+                  </span>
+
+                  <span className="action-group">
+                    <span className="action-group-label">Pobierz</span>
                     <button
                       disabled={albumBusy !== null}
-                      title="Usuń wszystkie okładki AI tego albumu"
+                      onClick={() => downloadAlbum(section.name!, section.tracks, "mp3", mode)}
+                    >
+                      {busyKey === `${section.name}:mp3` ? (
+                        <Loader2 size={13} className="spin" />
+                      ) : (
+                        <Download size={13} />
+                      )}{" "}
+                      MP3
+                    </button>
+                    <button
+                      disabled={albumBusy !== null}
+                      onClick={() => downloadAlbum(section.name!, section.tracks, "wav", mode)}
+                    >
+                      {busyKey === `${section.name}:wav` ? (
+                        <Loader2 size={13} className="spin" />
+                      ) : (
+                        <FileAudio size={13} />
+                      )}{" "}
+                      WAV
+                    </button>
+                    <button
+                      disabled={albumBusy !== null}
+                      onClick={() => downloadAlbumCovers(section.name!, section.tracks)}
+                    >
+                      {busyKey === `${section.name}:covers` ? (
+                        <Loader2 size={13} className="spin" />
+                      ) : (
+                        <ImageDown size={13} />
+                      )}{" "}
+                      Okładki
+                    </button>
+                    <button
+                      disabled={albumBusy !== null}
+                      onClick={() => downloadAlbumLyrics(section.name!, section.tracks)}
+                    >
+                      <FileText size={13} /> Teksty
+                    </button>
+                  </span>
+
+                  <span className="action-group">
+                    <span className="action-group-label">Okładki AI</span>
+                    <button
+                      disabled={albumBusy !== null}
+                      title="Wygeneruj brakujące okładki AI tego albumu"
                       onClick={async () => {
-                        const withCovers = section.tracks.filter((t) => t.aiImagePath);
-                        const ok = await confirm(
-                          `Usunąć okładki AI albumu „${section.name}” (${withCovers.length} ${plural(withCovers.length)})? Ponowne wygenerowanie kosztuje w OpenAI.`,
-                          { title: "Reset okładek AI", kind: "warning" }
-                        );
-                        if (!ok) return;
                         setMessage(null);
-                        setAlbumBusy(`${section.name}:reset`);
+                        setAlbumBusy(`${section.name}:aicover`);
                         try {
-                          await onResetCovers(section.tracks.map((t) => t.id));
-                          setMessage(`Usunięto okładki AI albumu „${section.name}”`);
+                          await onGenerateAlbumCovers(section.name!, (done, total) =>
+                            setMessage(
+                              `Generowanie okładek AI: ${done}/${total} — album „${section.name}”`
+                            )
+                          );
+                          setMessage(`Wygenerowano brakujące okładki AI albumu „${section.name}”`);
                         } catch (e) {
                           setMessage(e instanceof Error ? e.message : String(e));
                         } finally {
@@ -928,14 +898,68 @@ export default function LibraryView({
                         }
                       }}
                     >
-                      {busyKey === `${section.name}:reset` ? (
+                      {busyKey === `${section.name}:aicover` ? (
                         <Loader2 size={13} className="spin" />
                       ) : (
-                        <Eraser size={13} />
+                        <Sparkles size={13} />
                       )}{" "}
-                      Reset okładek
+                      Generuj
                     </button>
-                  )}
+                    {hasAiCovers && (
+                      <button
+                        disabled={albumBusy !== null}
+                        title="Usuń wszystkie okładki AI tego albumu"
+                        onClick={async () => {
+                          const withCovers = section.tracks.filter((t) => t.aiImagePath);
+                          const ok = await confirm(
+                            `Usunąć okładki AI albumu „${section.name}” (${withCovers.length} ${plural(withCovers.length)})? Ponowne wygenerowanie kosztuje w OpenAI.`,
+                            { title: "Reset okładek AI", kind: "warning" }
+                          );
+                          if (!ok) return;
+                          setMessage(null);
+                          setAlbumBusy(`${section.name}:reset`);
+                          try {
+                            await onResetCovers(section.tracks.map((t) => t.id));
+                            setMessage(`Usunięto okładki AI albumu „${section.name}”`);
+                          } catch (e) {
+                            setMessage(e instanceof Error ? e.message : String(e));
+                          } finally {
+                            setAlbumBusy(null);
+                          }
+                        }}
+                      >
+                        {busyKey === `${section.name}:reset` ? (
+                          <Loader2 size={13} className="spin" />
+                        ) : (
+                          <Eraser size={13} />
+                        )}{" "}
+                        Reset
+                      </button>
+                    )}
+                    {hasAiCovers && (
+                      <>
+                        <span className="action-group-label">aktywna</span>
+                        <span
+                          className="variant-switch"
+                          title="Która okładka albumu jest aktywna"
+                        >
+                          {(["suno", "ai"] as const).map((m) => (
+                            <button
+                              key={m}
+                              className={
+                                (section.tracks[0]?.coverSource ?? "suno") === m ? "active" : ""
+                              }
+                              onClick={() =>
+                                onSetCoverSource(section.tracks.map((t) => t.id), m)
+                              }
+                            >
+                              {m === "ai" ? "AI" : "Suno"}
+                            </button>
+                          ))}
+                        </span>
+                      </>
+                    )}
+                  </span>
                 </span>
               )}
             </div>

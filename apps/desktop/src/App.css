@@ -502,6 +502,10 @@ button.badge {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  /* Zawijanie MIĘDZY elementami. Bez tego flex ściskał je poniżej szerokości
+     treści i napisy łamały się w środku („Odtwórz / album", „Reset / okładek",
+     a nawet tytuł albumu i licznik utworów). */
+  flex-wrap: wrap;
   padding-bottom: 0.35rem;
   border-bottom: 1px solid var(--border);
   color: var(--text);
@@ -511,6 +515,7 @@ button.badge {
   margin-left: auto;
   color: var(--muted);
   font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .album-toggle {
@@ -519,16 +524,42 @@ button.badge {
   padding: 0.1rem 0.2rem;
   gap: 0.5rem;
   font-size: 1rem;
+  white-space: nowrap;
 }
 
+/* Akcje albumu dostają własny wiersz pod tytułem — jest ich kilkanaście
+   i nigdy nie zmieszczą się obok nazwy. */
 .album-group-actions {
-  display: inline-flex;
-  gap: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-basis: 100%;
+  /* Odstęp między grupami wyraźnie większy niż wewnątrz grupy (0.45rem) —
+     to on je rozdziela. Pionowa kreska odpadła: przy zawinięciu paska
+     zostawała wisząca na początku nowej linii. */
+  gap: 0.5rem 1.15rem;
 }
 
 .album-group-actions button {
   font-size: 0.75rem;
   padding: 0.2rem 0.6rem;
+  white-space: nowrap;
+}
+
+/* Klaster powiązanych akcji — etykieta + własne, ciasne odstępy sprawiają,
+   że kilkanaście identycznych pigułek czyta się jako kilka grup. */
+.action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.action-group-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .album-player {
@@ -555,21 +586,39 @@ button.badge {
   border-color: var(--accent);
 }
 
+/* Wybór trybu (wariant utworu, źródło okładki) — celowo zrośnięty w jedną
+   kontrolkę. Rozstrzelone przyciski wyglądały identycznie jak akcje obok,
+   przez co nie było widać, że to przełącznik stanu, a nie coś do kliknięcia
+   raz. */
 .variant-switch {
-  display: flex;
-  gap: 0.4rem;
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .variant-switch button {
-  font-size: 0.8rem;
-  padding: 0.25rem 0.7rem;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
   background: transparent;
+  border: none;
+  border-radius: 0;
+  white-space: nowrap;
+}
+
+.variant-switch button + button {
+  border-left: 1px solid var(--border);
+}
+
+/* Bazowy :hover podświetla obramowanie, którego tu nie ma. */
+.variant-switch button:hover:not(:disabled) {
+  background: var(--panel-2);
 }
 
 .variant-switch button.active {
   background: var(--panel-2);
-  border-color: var(--accent);
   color: var(--accent);
+  font-weight: 600;
 }
 
 .progress-wrap {
