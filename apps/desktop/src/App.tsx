@@ -21,7 +21,7 @@ import {
   saveTracks,
 } from "./services/storage";
 import { generateSong } from "./services/llm";
-import { generateAlbumCover, generateTrackCover } from "./services/cover";
+import { generateTrackCover } from "./services/cover";
 import { buildContext, retrieveChunks } from "./services/rag";
 import { createPersona, createTask, getTaskStatus, pollTask } from "./services/suno";
 import {
@@ -369,17 +369,29 @@ export default function App() {
     updateTrack(id, { aiImagePath: path, coverSource: "ai" });
   }
 
-  /** Jedna wspólna okładka AI dla całego albumu — zapisana przy każdym utworze. */
-  async function handleGenerateAlbumCover(album: string) {
-    const list = tracksRef.current.filter((t) => t.album === album);
-    const path = await generateAlbumCover(settingsRef.current.openaiKey, album, list);
-    setTracks((prev) => {
-      const next = prev.map((t) =>
-        t.album === album ? { ...t, aiImagePath: path, coverSource: "ai" as const } : t
-      );
-      void saveTracks(next);
-      return next;
-    });
+  /** Dogenerowuje brakujące okładki AI albumu — osobną dla każdego utworu. */
+  async function handleGenerateAlbumCovers(
+    album: string,
+    onProgress: (done: number, total: number) => void
+  ) {
+    const list = tracksRef.current.filter(
+      (t) => t.album === album && t.status === "SUCCESS" && !t.aiImagePath
+    );
+    if (list.length === 0) {
+      throw new Error("Wszystkie utwory albumu mają już okładkę AI");
+    }
+    const errors: string[] = [];
+    for (let i = 0; i < list.length; i++) {
+      onProgress(i, list.length);
+      try {
+        const path = await generateTrackCover(settingsRef.current.openaiKey, list[i]);
+        updateTrack(list[i].id, { aiImagePath: path, coverSource: "ai" });
+      } catch (e) {
+        errors.push(`${list[i].title}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    onProgress(list.length, list.length);
+    if (errors.length > 0) throw new Error(`Błędy: ${errors.join("; ")}`);
   }
 
   function handleSetCoverSource(ids: string[], source: "suno" | "ai") {
@@ -498,7 +510,7 @@ export default function App() {
             onCreatePersona={handleCreatePersona}
             onUpdateTrack={updateTrack}
             onGenerateCover={handleGenerateCover}
-            onGenerateAlbumCover={handleGenerateAlbumCover}
+            onGenerateAlbumCovers={handleGenerateAlbumCovers}
             onSetCoverSource={handleSetCoverSource}
           />
         </div>

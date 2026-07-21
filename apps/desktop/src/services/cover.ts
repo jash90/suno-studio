@@ -25,17 +25,6 @@ function coverPrompt(title: string, style: string, lyrics?: string): string {
   );
 }
 
-/** Prompt jednej wspólnej okładki albumu. */
-function albumCoverPrompt(albumName: string, tracks: Track[]): string {
-  const styles = [...new Set(tracks.map((t) => t.style))].join("; ").slice(0, 600);
-  const titles = tracks.map((t) => t.title).join(", ").slice(0, 300);
-  return (
-    `Album cover artwork for a music album titled "${albumName}". ` +
-    `Track titles: ${titles}. Musical styles across the album: ${styles}. ` +
-    `One cohesive square professional album cover, striking composition, no text, no words, no letters, no typography.`
-  );
-}
-
 /** Generuje obraz w OpenAI (gpt-image zwraca zawsze b64_json) i zwraca bajty PNG. */
 async function generateImage(openaiKey: string, prompt: string): Promise<Uint8Array> {
   const res = await fetch("https://api.openai.com/v1/images/generations", {
@@ -83,18 +72,6 @@ export async function generateTrackCover(
     coverPrompt(track.title, track.style, track.instrumental ? undefined : track.lyrics)
   );
   return storeImage(track.id, bytes);
-}
-
-/** Generuje jedną wspólną okładkę AI dla albumu; zwraca ścieżkę pliku PNG. */
-export async function generateAlbumCover(
-  openaiKey: string,
-  album: string,
-  tracks: Track[]
-): Promise<string> {
-  if (!openaiKey) throw new Error("Brak klucza OpenAI — uzupełnij w Ustawieniach");
-  if (tracks.length === 0) throw new Error("Album nie ma utworów");
-  const bytes = await generateImage(openaiKey, albumCoverPrompt(album, tracks));
-  return storeImage(tracks[0].id, bytes);
 }
 
 /** Adres pliku okładki dla <img> — asset:// zamiast ścieżki systemowej. */

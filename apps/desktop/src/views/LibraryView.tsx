@@ -190,7 +190,10 @@ interface Props {
   ) => Promise<void>;
   onUpdateTrack: (id: string, patch: Partial<Track>) => void;
   onGenerateCover: (id: string) => Promise<void>;
-  onGenerateAlbumCover: (album: string) => Promise<void>;
+  onGenerateAlbumCovers: (
+    album: string,
+    onProgress: (done: number, total: number) => void
+  ) => Promise<void>;
   onSetCoverSource: (ids: string[], source: "suno" | "ai") => void;
 }
 
@@ -215,7 +218,7 @@ export default function LibraryView({
   onCreatePersona,
   onUpdateTrack,
   onGenerateCover,
-  onGenerateAlbumCover,
+  onGenerateAlbumCovers,
   onSetCoverSource,
 }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -844,8 +847,12 @@ export default function LibraryView({
                       setMessage(null);
                       setAlbumBusy(`${section.name}:aicover`);
                       try {
-                        await onGenerateAlbumCover(section.name!);
-                        setMessage(`Wygenerowano okładkę AI albumu „${section.name}”`);
+                        await onGenerateAlbumCovers(section.name!, (done, total) =>
+                          setMessage(
+                            `Generowanie okładek AI: ${done}/${total} — album „${section.name}”`
+                          )
+                        );
+                        setMessage(`Wygenerowano brakujące okładki AI albumu „${section.name}”`);
                       } catch (e) {
                         setMessage(e instanceof Error ? e.message : String(e));
                       } finally {
@@ -858,7 +865,7 @@ export default function LibraryView({
                     ) : (
                       <Sparkles size={13} />
                     )}{" "}
-                    Okładka AI
+                    Okładki AI
                   </button>
                   {section.tracks.some((t) => t.aiImagePath) && (
                     <span className="variant-switch" title="Która okładka albumu jest aktywna">
