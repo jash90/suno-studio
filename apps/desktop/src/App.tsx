@@ -6,6 +6,7 @@ import AlbumView from "./views/AlbumView";
 import CreateView from "./views/CreateView";
 import FilesView from "./views/FilesView";
 import LibraryView from "./views/LibraryView";
+import PlayerView from "./views/PlayerView";
 import SettingsView from "./views/SettingsView";
 import {
   loadAlbum,
@@ -20,6 +21,7 @@ import {
   saveTracks,
 } from "./services/storage";
 import { generateSong } from "./services/llm";
+import { generateAlbumCover, generateTrackCover } from "./services/cover";
 import { buildContext, retrieveChunks } from "./services/rag";
 import { createPersona, createTask, getTaskStatus, pollTask } from "./services/suno";
 import {
@@ -29,6 +31,7 @@ import {
   LibraryDoc,
   Persona,
   PersonaModel,
+  Playback,
   Provider,
   Settings,
   SongDraft,
@@ -37,7 +40,7 @@ import {
 } from "./types";
 import "./App.css";
 
-type View = "create" | "album" | "files" | "library" | "settings";
+type View = "create" | "album" | "files" | "library" | "player" | "settings";
 
 export default function App() {
   const [view, setView] = useState<View>("create");
@@ -48,6 +51,8 @@ export default function App() {
   const [album, setAlbum] = useState<Album | null>(null);
   const [albumWriting, setAlbumWriting] = useState(false);
   const [balances, setBalances] = useState<Balances>({});
+  // Kolejka odtwarzania żyje na poziomie App — gra niezależnie od aktywnej zakładki
+  const [playback, setPlayback] = useState<Playback | null>(null);
   const [balancesRefreshing, setBalancesRefreshing] = useState(false);
   const [ready, setReady] = useState(false);
   const pollingRef = useRef<Set<string>>(new Set());
@@ -55,6 +60,8 @@ export default function App() {
   const albumRef = useRef<Album | null>(null);
   const libraryRef = useRef<LibraryDoc[]>([]);
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
+  const tracksRef = useRef<Track[]>([]);
+  tracksRef.current = tracks;
   albumRef.current = album;
   libraryRef.current = library;
   settingsRef.current = settings;
@@ -326,6 +333,73 @@ export default function App() {
     });
   }
 
+  /** Wysyła nieudaną generację do Suno jeszcze raz — nowe zadanie, ten sam wpis. */
+  async function handleRetryTrack(id: string) {
+    const track = tracksRef.current.find((t) => t.id === id);
+    if (!track) throw new Error("Nie znaleziono utworu");
+    if (track.status !== "FAILED") throw new Error("Ponowić można tylko nieudaną generację");
+    const taskId = await createTask(
+      settingsRef.current.sunoKey,
+      { title: track.title, style: track.style, lyrics: track.lyrics },
+      track.sunoModel,
+      track.instrumental
+    );
+    // czyścimy media i błąd po nieudanej próbie — wpis startuje od zera
+    updateTrack(id, {
+      taskId,
+      status: "PENDING",
+      error: undefined,
+      variants: undefined,
+      audioId: undefined,
+      audioUrl: undefined,
+      streamAudioUrl: undefined,
+      imageUrl: undefined,
+      duration: undefined,
+      wavUrl: undefined,
+      createdAt: new Date().toISOString(),
+    });
+    startPolling({ ...track, taskId }, settingsRef.current.sunoKey);
+    void refreshBalances(); // ponowna generacja zjada kredyty Suno
+  }
+
+  async function handleGenerateCover(id: string) {
+    const track = tracksRef.current.find((t) => t.id === id);
+    if (!track) throw new Error("Nie znaleziono utworu");
+    const path = await generateTrackCover(settingsRef.current.openaiKey, track);
+    updateTrack(id, { aiImagePath: path, coverSource: "ai" });
+  }
+
+  /** Jedna wspólna okładka AI dla całego albumu — zapisana przy każdym utworze. */
+  async function handleGenerateAlbumCover(album: string) {
+    const list = tracksRef.current.filter((t) => t.album === album);
+    const path = await generateAlbumCover(settingsRef.current.openaiKey, album, list);
+    setTracks((prev) => {
+      const next = prev.map((t) =>
+        t.album === album ? { ...t, aiImagePath: path, coverSource: "ai" as const } : t
+      );
+      void saveTracks(next);
+      return next;
+    });
+  }
+
+  function handleSetCoverSource(ids: string[], source: "suno" | "ai") {
+    setTracks((prev) => {
+      const next = prev.map((t) => (ids.includes(t.id) ? { ...t, coverSource: source } : t));
+      void saveTracks(next);
+      return next;
+    });
+  }
+
+  /** Przewija kolejkę; indeks poza zakresem = koniec (albo powrót przy zapętleniu). */
+  function seekPlaybackTo(index: number) {
+    setPlayback((p) => {
+      if (!p) return p;
+      if (index < 0) return null;
+      if (index >= p.queue.length) return p.repeat ? { ...p, index: 0 } : null;
+      return { ...p, index };
+    });
+  }
+
   function handleDeleteTrack(id: string) {
     setTracks((prev) => {
       const next = prev.filter((t) => t.id !== id);
@@ -366,6 +440,9 @@ export default function App() {
           <button className={view === "library" ? "active" : ""} onClick={() => setView("library")}>
             Biblioteka{pendingCount > 0 ? ` (${pendingCount})` : ""}
           </button>
+          <button className={view === "player" ? "active" : ""} onClick={() => setView("player")}>
+            Odtwarzacz{playback ? " ♪" : ""}
+          </button>
           <button className={view === "settings" ? "active" : ""} onClick={() => setView("settings")}>
             Ustawienia
           </button>
@@ -403,9 +480,34 @@ export default function App() {
             tracks={tracks}
             sunoKey={settings.sunoKey}
             defaultSaveDir={settings.defaultSaveDir}
+            playback={playback}
+            onPlay={(p) => {
+              setPlayback(p);
+              setView("player");
+            }}
+            onAddToQueue={(item) =>
+              setPlayback((p) =>
+                p
+                  ? { ...p, queue: [...p.queue, item] }
+                  : { name: "Kolejka", queue: [item], index: 0, repeat: false }
+              )
+            }
+            onStopPlayback={() => setPlayback(null)}
             onDelete={handleDeleteTrack}
+            onRetry={handleRetryTrack}
             onCreatePersona={handleCreatePersona}
             onUpdateTrack={updateTrack}
+            onGenerateCover={handleGenerateCover}
+            onGenerateAlbumCover={handleGenerateAlbumCover}
+            onSetCoverSource={handleSetCoverSource}
+          />
+        </div>
+        <div className={view === "player" ? "" : "hidden"}>
+          <PlayerView
+            playback={playback}
+            onSeekTo={seekPlaybackTo}
+            onStop={() => setPlayback(null)}
+            onChange={setPlayback}
           />
         </div>
         <div className={view === "settings" ? "" : "hidden"}>

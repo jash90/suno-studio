@@ -1,51 +1,25 @@
 import { fetch } from "@tauri-apps/plugin-http";
+import { AlbumConcept, Provider, Settings, SongDraft, SunoModel } from "../types";
 import {
-  AlbumConcept,
-  Provider,
-  Settings,
-  SongDraft,
-  SUNO_LIMITS,
-  SunoModel,
-} from "../types";
+  ALBUM_PROMPT_TEMPLATE,
+  SONG_PROMPT_TEMPLATE,
+  fillAlbumPrompt,
+  fillSongPrompt,
+} from "../prompts";
 
 // Uwaga: wywołania idą przez plugin-http Tauri (proces Rust), nie przez fetch
 // webview — dzięki temu brak ograniczeń CORS i klucze nie wyciekają do stron www.
 
-function systemPrompt(model: SunoModel, brief: string, guides: string): string {
-  const limits = SUNO_LIMITS[model];
-  return `Jesteś profesjonalnym tekściarzem piszącym piosenki pod generator muzyki Suno.
-Na podstawie materiałów źródłowych użytkownika napisz kompletną, dopracowaną piosenkę.
-
-Zwróć WYŁĄCZNIE poprawny JSON (bez markdown, bez komentarzy) o kształcie:
-{"title": "...", "style": "...", "lyrics": "..."}
-
-Zasady dla "style" (maks. ${limits.style - 100} znaków, po angielsku):
-- Warstwowy, precyzyjny opis wg wzoru: [gatunek + era/odmiana], [charakter, np.
-  cinematic], [rytm/tempo], [instrumentacja — konkretne instrumenty], [wokal — płeć,
-  barwa, emocja], [nastrój], [dynamika, np. gradual build], [atmosfera], [produkcja].
-- Przykład dobrego stylu: "Dark Slavic folk ballad, cinematic folk, slow ritual
-  drums, lyre and wooden flute, raw emotional female vocal with low male
-  countervoice, bittersweet and dramatic, gradual build, ancient forest atmosphere,
-  organic production". Unikaj ogólników typu "rock song".
-
-Zasady dla "lyrics" (maks. ${limits.lyrics - 500} znaków):
-- Tekst piosenki w języku materiałów źródłowych (chyba że brief mówi inaczej);
-  wszystkie tagi po angielsku, w nawiasach kwadratowych.
-- Używaj ROZBUDOWANYCH tagów Suno, nie tylko [Verse]/[Chorus]:
-  * sekcje z opisem wykonania: [Verse 1: Female Vocal, Soft and Intimate],
-    [Pre-Chorus: Building Tension], [Chorus: Full Ensemble, Layered Choir],
-    [Bridge: Barely Controlled], [Final Chorus: Intense]
-  * atmosfera i efekty dźwiękowe jako osobne tagi w miejscu wystąpienia:
-    [Forest Ambience], [Crackling Fire], [River Sound], [Wind Through Leaves]
-  * wokale specjalne: [Female Whisper], [Low Male Countervoice], [Choir]
-  * przerywniki: [Short Instrumental Intro], [Instrumental Break] z tagami
-    instrumentów ([Deep Drums], [Horn Call]), na końcu [Outro: ...] i [Fade Out]
-- Buduj dramaturgię: intro → zwrotki → pre-chorus narastający → refren → bridge →
-  finałowy refren (może mieć zmieniony tekst) → wyciszone outro.
-- Refren powtarzaj w całości; drobne zmiany w finałowym refrenie wzmacniają puentę.
-
-Zasady dla "title": chwytliwy tytuł, maks. ${limits.title - 10} znaków.
-${brief ? `\nWytyczne użytkownika (brief): ${brief}` : ""}${
+/** Prompt systemowy piosenki: szablon (własny lub wbudowany) + brief i poradniki. */
+function systemPrompt(
+  template: string,
+  model: SunoModel,
+  brief: string,
+  guides: string
+): string {
+  return `${fillSongPrompt(template, model)}${
+    brief ? `\n\nWytyczne użytkownika (brief): ${brief}` : ""
+  }${
     guides
       ? `\n\nPoradniki użytkownika dot. pisania pod Suno — zastosuj opisane w nich
 techniki tagowania, szablony stylu i strukturę (to INSTRUKCJE, nie treść piosenki).
@@ -235,7 +209,12 @@ export async function generateSong(
       `Brak klucza API dla ${provider === "openai" ? "OpenAI" : "Anthropic"} — uzupełnij w Ustawieniach`
     );
   }
-  const system = systemPrompt(sunoModel, brief, guides);
+  const system = systemPrompt(
+    settings.songSystemPrompt?.trim() || SONG_PROMPT_TEMPLATE,
+    sunoModel,
+    brief,
+    guides
+  );
   const user = context
     ? `Fragmenty materiałów źródłowych dobrane z biblioteki użytkownika:\n\n${context}`
     : "Brak materiałów źródłowych — napisz piosenkę wyłącznie na podstawie briefu.";
@@ -261,22 +240,8 @@ export async function generateAlbumConcept(
       `Brak klucza API dla ${provider === "openai" ? "OpenAI" : "Anthropic"} — uzupełnij w Ustawieniach`
     );
   }
-  const system = `Jesteś producentem muzycznym planującym koncept-album pod generator Suno.
-Zaplanuj spójny album o dramaturgii: otwarcie → rozwinięcie → punkt kulminacyjny → zamknięcie.
-
-Zwróć JSON: {"albumTitle": "...", "styleDirection": "...", "songs": [...]} z DOKŁADNIE ${songCount} piosenkami.
-
-- "albumTitle": tytuł albumu w języku briefu.
-- "styleDirection": wspólny kierunek stylistyczny CAŁEGO albumu po angielsku, wg
-  warstwowego wzorca Suno: gatunek+era, charakter, rytm, instrumentacja, wokal,
-  nastrój, dynamika, atmosfera, produkcja (jak np. "Dark Slavic folk ballad,
-  cinematic folk, slow ritual drums, lyre and wooden flute, raw female vocal...").
-- każda piosenka w "songs":
-  * "title": roboczy tytuł,
-  * "brief": 2-4 zdania — o czym jest, kluczowe obrazy i emocje, miejsce w
-    dramaturgii albumu (w języku briefu),
-  * "styleHints": po angielsku — co wyróżnia ten utwór w ramach styleDirection
-    (tempo, instrument prowadzący, charakter wokalu, energia).${
+  const template = settings.albumSystemPrompt?.trim() || ALBUM_PROMPT_TEMPLATE;
+  const system = `${fillAlbumPrompt(template, songCount)}${
     guides
       ? `\n\nPoradniki użytkownika dot. Suno (INSTRUKCJE, nie treść):\n\n${guides}`
       : ""

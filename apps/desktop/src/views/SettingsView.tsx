@@ -9,6 +9,46 @@ import {
   Settings,
   SunoModel,
 } from "../types";
+import { ALBUM_PROMPT_TEMPLATE, SONG_PROMPT_TEMPLATE } from "../prompts";
+
+/** Edytor promptu systemowego: puste pole = wbudowany szablon. */
+function PromptEditor({
+  label,
+  value,
+  defaultTemplate,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  defaultTemplate: string;
+  onChange: (v: string) => void;
+}) {
+  const isCustom = value.trim() !== "";
+  return (
+    <label>
+      <span className="label-row">
+        {label}
+        <span className="counter">{isCustom ? "własny" : "wbudowany"}</span>
+      </span>
+      <textarea
+        rows={10}
+        value={value}
+        placeholder='Używany jest wbudowany prompt — kliknij „Wstaw wbudowany do edycji", aby go zmienić'
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <span className="doc-picker-actions">
+        <button type="button" className="btn-link" onClick={() => onChange(defaultTemplate)}>
+          Wstaw wbudowany do edycji
+        </button>
+        {isCustom && (
+          <button type="button" className="btn-link" onClick={() => onChange("")}>
+            Przywróć wbudowany
+          </button>
+        )}
+      </span>
+    </label>
+  );
+}
 
 /** Select z listą modeli; zachowuje bieżącą wartość spoza listy jako dodatkową opcję. */
 function ModelSelect({
@@ -174,6 +214,24 @@ export default function SettingsView({ settings, onSave }: Props) {
           </button>
         )}
       </div>
+
+      <h2>Prompty systemowe</h2>
+      <p className="hint">
+        Instrukcje dla AI piszącego teksty i planującego album. Puste pole = prompt
+        wbudowany. Brief i poradniki z biblioteki doklejają się automatycznie.
+      </p>
+      <PromptEditor
+        label="Prompt piosenki"
+        value={form.songSystemPrompt}
+        defaultTemplate={SONG_PROMPT_TEMPLATE}
+        onChange={(v) => set("songSystemPrompt", v)}
+      />
+      <PromptEditor
+        label="Prompt albumu"
+        value={form.albumSystemPrompt}
+        defaultTemplate={ALBUM_PROMPT_TEMPLATE}
+        onChange={(v) => set("albumSystemPrompt", v)}
+      />
 
       <h2>Domyślne ustawienia</h2>
       <div className="controls-row">

@@ -5,15 +5,20 @@ import {
   Disc3,
   Download,
   FileAudio,
+  FileText,
   ImageDown,
+  ListPlus,
   Loader2,
   Play,
+  RotateCcw,
+  Sparkles,
   Square,
   UserRound,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { mkdir } from "@tauri-apps/plugin-fs";
 import Player from "../components/Player";
+import { coverSrc, saveCoverAs } from "../services/cover";
 import {
   convertToWav,
   downloadImageFile,
@@ -22,8 +27,9 @@ import {
   downloadWavFile,
   imageExt,
   sanitizeFileName,
+  saveTextFile,
 } from "../services/suno";
-import { Track, TrackVariant } from "../types";
+import { Playback, PlayQueueItem, Track, TrackVariant } from "../types";
 
 /** Warianty utworu; starsze wpisy historii mają tylko pola płaskie — sklejamy z nich wariant A. */
 function getVariants(track: Track): TrackVariant[] {
@@ -42,6 +48,28 @@ function getVariants(track: Track): TrackVariant[] {
 }
 
 const VARIANT_LETTERS = ["A", "B", "C", "D"];
+
+/** Aktywna okładka utworu: AI (jeśli wybrana i istnieje) albo oryginalna z Suno.
+ *  Okładka AI jest plikiem lokalnym, więc rozróżniamy ją flagą `ai`. */
+function activeCover(
+  track: Track,
+  variant?: TrackVariant
+): { src: string; ai: boolean } | null {
+  if (track.coverSource === "ai" && track.aiImagePath) {
+    return { src: track.aiImagePath, ai: true };
+  }
+  const url = variant?.imageUrl ?? track.imageUrl;
+  return url ? { src: url, ai: false } : null;
+}
+
+/** Zapisuje okładkę (URL Suno albo plik AI) pod wskazaną ścieżką bez rozszerzenia. */
+async function saveCover(
+  cover: { src: string; ai: boolean },
+  pathWithoutExt: string
+): Promise<void> {
+  if (cover.ai) return saveCoverAs(cover.src, `${pathWithoutExt}.png`);
+  return downloadToPath(cover.src, `${pathWithoutExt}.${imageExt(cover.src)}`);
+}
 
 function plural(n: number): string {
   if (n === 1) return "utwór";
@@ -148,7 +176,12 @@ interface Props {
   tracks: Track[];
   sunoKey: string;
   defaultSaveDir: string;
+  playback: Playback | null;
+  onPlay: (playback: Playback) => void;
+  onAddToQueue: (item: PlayQueueItem) => void;
+  onStopPlayback: () => void;
   onDelete: (id: string) => void;
+  onRetry: (id: string) => Promise<void>;
   onCreatePersona: (
     track: Track,
     audioId: string,
@@ -156,6 +189,9 @@ interface Props {
     description: string
   ) => Promise<void>;
   onUpdateTrack: (id: string, patch: Partial<Track>) => void;
+  onGenerateCover: (id: string) => Promise<void>;
+  onGenerateAlbumCover: (album: string) => Promise<void>;
+  onSetCoverSource: (ids: string[], source: "suno" | "ai") => void;
 }
 
 const STATUS_LABELS: Record<Track["status"], string> = {
@@ -170,39 +206,58 @@ export default function LibraryView({
   tracks,
   sunoKey,
   defaultSaveDir,
+  playback,
+  onPlay,
+  onAddToQueue,
+  onStopPlayback,
   onDelete,
+  onRetry,
   onCreatePersona,
   onUpdateTrack,
+  onGenerateCover,
+  onGenerateAlbumCover,
+  onSetCoverSource,
 }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [personaFor, setPersonaFor] = useState<string | null>(null);
   const [wavBusy, setWavBusy] = useState<string | null>(null);
+  const [retryBusy, setRetryBusy] = useState<string | null>(null);
+  const [coverBusy, setCoverBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // wybrany wariant per utwór (domyślnie A)
   const [variantIndex, setVariantIndex] = useState<Record<string, number>>({});
-  // wybrany wariant dla pobierania całego albumu, klucz = nazwa albumu (domyślnie A)
-  const [albumVariant, setAlbumVariant] = useState<Record<string, number>>({});
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [albumBusy, setAlbumBusy] = useState<string | null>(null);
-  // odtwarzanie albumu po kolei: nazwa albumu + id aktualnego utworu
-  const [albumPlay, setAlbumPlay] = useState<{ name: string; trackId: string } | null>(null);
+  // które warianty trafiają do pobierania i kolejki albumu (per album, domyślnie oba)
+  const [albumMode, setAlbumMode] = useState<Record<string, "a" | "b" | "both">>({});
 
-  function playableTracks(list: Track[]): Track[] {
-    return list.filter((t) => {
-      const v = getVariants(t)[variantIndex[t.id] ?? 0];
-      return t.status === "SUCCESS" && (v?.audioUrl || v?.streamAudioUrl);
-    });
+  /** Warianty utworu wybrane trybem A / B / A+B (fallback do A, gdy B nie istnieje). */
+  function chosenVariants(track: Track, mode: "a" | "b" | "both"): TrackVariant[] {
+    const all = getVariants(track);
+    if (mode === "both") return all;
+    return [all[mode === "b" ? 1 : 0] ?? all[0]].filter(Boolean);
   }
 
-  function advanceAlbum(name: string, list: Track[]) {
-    const playable = playableTracks(list);
-    const current = playable.findIndex((t) => t.id === albumPlay?.trackId);
-    if (current >= 0 && current + 1 < playable.length) {
-      setAlbumPlay({ name, trackId: playable[current + 1].id });
-    } else {
-      setAlbumPlay(null); // koniec płyty
-    }
+  /** Buduje kolejkę odtwarzania albumu z wariantów wybranych przełącznikiem. */
+  function buildQueue(list: Track[], mode: "a" | "b" | "both"): PlayQueueItem[] {
+    const items: PlayQueueItem[] = [];
+    list.forEach((t, i) => {
+      if (t.status !== "SUCCESS") return;
+      const all = getVariants(t);
+      for (const v of chosenVariants(t, mode)) {
+        const url = v.audioUrl || v.streamAudioUrl;
+        if (!url) continue;
+        const letter =
+          all.length > 1 ? ` (${VARIANT_LETTERS[all.indexOf(v)] ?? all.indexOf(v) + 1})` : "";
+        items.push({
+          trackId: t.id,
+          label: `${(t.albumIndex ?? i) + 1}. ${t.title}${letter}`,
+          url,
+        });
+      }
+    });
+    return items;
   }
 
   function toggleCollapsed(name: string) {
@@ -212,8 +267,13 @@ export default function LibraryView({
     setCollapsed(next);
   }
 
-  /** Pobiera cały album do wybranego folderu: pliki "NN - Tytuł (A).mp3/.wav" wg kolejności płyty. */
-  async function downloadAlbum(name: string, list: Track[], format: "mp3" | "wav", variantSel: number) {
+  /** Pobiera cały album do podfolderu „Nazwa (tryb)": pliki "NN - Tytuł (A).mp3/.wav". */
+  async function downloadAlbum(
+    name: string,
+    list: Track[],
+    format: "mp3" | "wav",
+    mode: "a" | "b" | "both"
+  ) {
     setMessage(null);
     const done = list.filter((t) => t.status === "SUCCESS");
     if (done.length === 0) {
@@ -224,45 +284,50 @@ export default function LibraryView({
       defaultSaveDir ||
       (await open({ directory: true, title: `Gdzie utworzyć folder albumu „${name}”` }));
     if (!parent) return;
-    // podfolder z nazwą albumu i oznaczeniem wariantu, np. „Mój Album (A)”
-    const albumLetter = VARIANT_LETTERS[variantSel] ?? String(variantSel + 1);
-    const dir = `${parent}/${sanitizeFileName(name)} (${albumLetter})`;
+    // podfolder z nazwą albumu i oznaczeniem wariantów, np. „Mój Album (A+B)”
+    const label = mode === "both" ? "A+B" : mode.toUpperCase();
+    const dir = `${parent}/${sanitizeFileName(name)} (${label})`;
     await mkdir(dir, { recursive: true });
     setAlbumBusy(`${name}:${format}`);
     let saved = 0;
+    let total = 0;
     const errors: string[] = [];
     try {
       for (let i = 0; i < done.length; i++) {
         const track = done[i];
-        const variants = getVariants(track);
-        // gdy utwór nie ma wybranego wariantu (np. tylko A) — bierzemy najbliższy istniejący
-        const vi = Math.min(variantSel, variants.length - 1);
-        const variant = variants[vi];
-        if (!variant) continue;
-        setMessage(`Pobieranie albumu (${format.toUpperCase()}): ${i + 1}/${done.length} — ${track.title}`);
-        const letter = VARIANT_LETTERS[vi] ?? String(vi + 1);
-        const fileName = `${String((track.albumIndex ?? i) + 1).padStart(2, "0")} - ${sanitizeFileName(track.title)} (${letter}).${format}`;
-        try {
-          let url = variant.audioUrl;
-          if (format === "wav") {
-            url = variant.wavUrl;
-            if (!url) {
-              url = await convertToWav(sunoKey, track.taskId, variant.audioId);
-              const variants = getVariants(track).map((v) =>
-                v.audioId === variant.audioId ? { ...v, wavUrl: url } : v
-              );
-              onUpdateTrack(track.id, { variants });
+        const all = getVariants(track);
+        const variants = chosenVariants(track, mode);
+        const nn = String((track.albumIndex ?? i) + 1).padStart(2, "0");
+        for (const variant of variants) {
+          total++;
+          const letter = VARIANT_LETTERS[all.indexOf(variant)] ?? String(all.indexOf(variant) + 1);
+          const suffix = all.length > 1 ? ` (${letter})` : "";
+          setMessage(
+            `Pobieranie albumu (${format.toUpperCase()}): ${i + 1}/${done.length} — ${track.title}${suffix}`
+          );
+          const fileName = `${nn} - ${sanitizeFileName(track.title)}${suffix}.${format}`;
+          try {
+            let url = variant.audioUrl;
+            if (format === "wav") {
+              url = variant.wavUrl;
+              if (!url) {
+                url = await convertToWav(sunoKey, track.taskId, variant.audioId);
+                const patched = getVariants(track).map((v) =>
+                  v.audioId === variant.audioId ? { ...v, wavUrl: url } : v
+                );
+                onUpdateTrack(track.id, { variants: patched });
+              }
             }
+            if (!url) throw new Error("brak pliku audio");
+            await downloadToPath(url, `${dir}/${fileName}`);
+            saved++;
+          } catch (e) {
+            errors.push(`${track.title}${suffix}: ${e instanceof Error ? e.message : e}`);
           }
-          if (!url) throw new Error("brak pliku audio");
-          await downloadToPath(url, `${dir}/${fileName}`);
-          saved++;
-        } catch (e) {
-          errors.push(`${track.title}: ${e instanceof Error ? e.message : e}`);
         }
       }
       setMessage(
-        `Zapisano ${saved}/${done.length} plików ${format.toUpperCase()} albumu „${name}”` +
+        `Zapisano ${saved}/${total} plików ${format.toUpperCase()} albumu „${name}”` +
           (errors.length ? ` (błędy: ${errors.join("; ")})` : "")
       );
     } finally {
@@ -270,24 +335,23 @@ export default function LibraryView({
     }
   }
 
-  /** Pobiera okładki wszystkich utworów albumu do wybranego folderu. */
-  async function downloadAlbumCovers(name: string, list: Track[], variantSel: number) {
+  /** Pobiera okładki utworów albumu; wspólna okładka AI zapisuje się raz. */
+  async function downloadAlbumCovers(name: string, list: Track[]) {
     setMessage(null);
     const withCovers = list
-      .map((t, i) => {
-        const variants = getVariants(t);
-        const vi = Math.min(variantSel, variants.length - 1);
-        return {
-          track: t,
-          order: t.albumIndex ?? i,
-          imageUrl: variants[vi]?.imageUrl ?? t.imageUrl,
-        };
-      })
-      .filter((x) => x.imageUrl);
+      .map((t, i) => ({
+        track: t,
+        order: t.albumIndex ?? i,
+        cover: activeCover(t, getVariants(t)[variantIndex[t.id] ?? 0]),
+      }))
+      .filter((x) => x.cover !== null);
     if (withCovers.length === 0) {
       setMessage("Album nie ma jeszcze okładek");
       return;
     }
+    const unique = withCovers.filter(
+      (x, i) => withCovers.findIndex((y) => y.cover!.src === x.cover!.src) === i
+    );
     const dir =
       defaultSaveDir ||
       (await open({ directory: true, title: `Folder na okładki „${name}”` }));
@@ -295,18 +359,44 @@ export default function LibraryView({
     setAlbumBusy(`${name}:covers`);
     let saved = 0;
     try {
-      for (const { track, order, imageUrl } of withCovers) {
-        const fileName = `${String(order + 1).padStart(2, "0")} - ${sanitizeFileName(track.title)}.${imageExt(imageUrl!)}`;
+      for (const { track, order, cover } of unique) {
+        const base =
+          unique.length === 1
+            ? `${sanitizeFileName(name)} - okładka`
+            : `${String(order + 1).padStart(2, "0")} - ${sanitizeFileName(track.title)}`;
         try {
-          await downloadToPath(imageUrl!, `${dir}/${fileName}`);
+          await saveCover(cover!, `${dir}/${base}`);
           saved++;
         } catch {
           /* pojedynczy błąd nie przerywa reszty */
         }
       }
-      setMessage(`Zapisano ${saved}/${withCovers.length} okładek albumu „${name}”`);
+      setMessage(`Zapisano ${saved}/${unique.length} okładek albumu „${name}”`);
     } finally {
       setAlbumBusy(null);
+    }
+  }
+
+  /** Zapisuje teksty wszystkich piosenek albumu do jednego pliku .txt. */
+  async function downloadAlbumLyrics(name: string, list: Track[]) {
+    setMessage(null);
+    const withLyrics = list.filter((t) => t.lyrics);
+    if (withLyrics.length === 0) {
+      setMessage("Album nie ma jeszcze tekstów");
+      return;
+    }
+    const sep = "\n\n" + "—".repeat(40) + "\n\n";
+    const body = withLyrics
+      .map(
+        (t, i) =>
+          `${String((t.albumIndex ?? i) + 1).padStart(2, "0")}. ${t.title}\nStyl: ${t.style}\n\n${t.lyrics}`
+      )
+      .join(sep);
+    try {
+      const path = await saveTextFile(`${name}${sep}${body}`, `${name} - teksty`, defaultSaveDir);
+      if (path) setMessage(`Zapisano teksty albumu „${name}” (${withLyrics.length})`);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -405,14 +495,21 @@ export default function LibraryView({
           const variants = getVariants(track);
           const selectedIndex = Math.min(variantIndex[track.id] ?? 0, Math.max(variants.length - 1, 0));
           const variant = variants[selectedIndex];
+          const cover = activeCover(track, variant);
           return (
           <li
             key={track.id}
-            className={`track${albumPlay?.trackId === track.id ? " playing" : ""}`}
+            className={`track${
+              playback?.queue[playback.index]?.trackId === track.id ? " playing" : ""
+            }`}
           >
             <div className="track-header">
-              {(variant?.imageUrl ?? track.imageUrl) && (
-                <img className="track-cover" src={variant?.imageUrl ?? track.imageUrl} alt="" />
+              {cover && (
+                <img
+                  className="track-cover"
+                  src={cover.ai ? coverSrc(cover.src) : cover.src}
+                  alt=""
+                />
               )}
               <div className="track-meta">
                 <strong>{track.title}</strong>
@@ -479,19 +576,35 @@ export default function LibraryView({
                   )}
                 </button>
               )}
-              {variant?.imageUrl && (
+              {track.status === "SUCCESS" && variant && (variant.audioUrl || variant.streamAudioUrl) && (
+                <button
+                  onClick={() => {
+                    onAddToQueue({
+                      trackId: track.id,
+                      label:
+                        (track.albumIndex !== undefined ? `${track.albumIndex + 1}. ` : "") +
+                        variantName(track, selectedIndex),
+                      url: (variant.audioUrl || variant.streamAudioUrl)!,
+                    });
+                    setMessage(`Dodano do kolejki: ${variantName(track, selectedIndex)}`);
+                  }}
+                >
+                  <ListPlus size={14} /> Do kolejki
+                </button>
+              )}
+              {cover && (
                 <button
                   onClick={async () => {
+                    const label = variantName(track, selectedIndex);
                     try {
-                      const label = variantName(track, selectedIndex);
                       if (defaultSaveDir) {
-                        await downloadToPath(
-                          variant.imageUrl!,
-                          `${defaultSaveDir}/${sanitizeFileName(label)}.${imageExt(variant.imageUrl!)}`
-                        );
+                        await saveCover(cover, `${defaultSaveDir}/${sanitizeFileName(label)}`);
                         setMessage(`Zapisano okładkę „${track.title}" → ${defaultSaveDir}`);
+                      } else if (cover.ai) {
+                        // plik AI trafia obok innych pobrań — dialog zapisu obsługuje tylko URL-e
+                        setMessage("Ustaw folder zapisu w Ustawieniach, aby zapisać okładkę AI");
                       } else {
-                        const saved = await downloadImageFile(variant.imageUrl!, label);
+                        const saved = await downloadImageFile(cover.src, label);
                         if (saved) setMessage(`Zapisano okładkę „${track.title}"`);
                       }
                     } catch (e) {
@@ -502,9 +615,87 @@ export default function LibraryView({
                   <ImageDown size={14} /> Okładka
                 </button>
               )}
+              {track.status === "SUCCESS" && (
+                <button
+                  disabled={coverBusy === track.id}
+                  onClick={async () => {
+                    setMessage(null);
+                    setCoverBusy(track.id);
+                    try {
+                      await onGenerateCover(track.id);
+                      setMessage(`Wygenerowano okładkę AI „${track.title}"`);
+                    } catch (e) {
+                      setMessage(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setCoverBusy(null);
+                    }
+                  }}
+                >
+                  {coverBusy === track.id ? (
+                    <><Loader2 size={14} className="spin" /> Generuję okładkę...</>
+                  ) : (
+                    <><Sparkles size={14} /> Okładka AI</>
+                  )}
+                </button>
+              )}
+              {track.aiImagePath && (
+                <span className="variant-switch" title="Która okładka jest aktywna">
+                  {(["suno", "ai"] as const).map((m) => (
+                    <button
+                      key={m}
+                      className={(track.coverSource ?? "suno") === m ? "active" : ""}
+                      onClick={() => onSetCoverSource([track.id], m)}
+                    >
+                      {m === "ai" ? "AI" : "Suno"}
+                    </button>
+                  ))}
+                </span>
+              )}
+              {track.status === "FAILED" && (
+                <button
+                  disabled={retryBusy === track.id}
+                  onClick={async () => {
+                    setMessage(null);
+                    setRetryBusy(track.id);
+                    try {
+                      await onRetry(track.id);
+                      setMessage(`„${track.title}" wysłano ponownie do Suno`);
+                    } catch (e) {
+                      setMessage(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setRetryBusy(null);
+                    }
+                  }}
+                >
+                  {retryBusy === track.id ? (
+                    <><Loader2 size={14} className="spin" /> Wysyłanie...</>
+                  ) : (
+                    <><RotateCcw size={14} /> Generuj ponownie</>
+                  )}
+                </button>
+              )}
               <button onClick={() => setExpanded(expanded === track.id ? null : track.id)}>
                 {expanded === track.id ? "Ukryj tekst" : "Pokaż tekst"}
               </button>
+              {track.lyrics && (
+                <button
+                  onClick={async () => {
+                    setMessage(null);
+                    try {
+                      const path = await saveTextFile(
+                        `${track.title}\nStyl: ${track.style}\n\n${track.lyrics}`,
+                        track.title,
+                        defaultSaveDir
+                      );
+                      if (path) setMessage(`Zapisano tekst „${track.title}"`);
+                    } catch (e) {
+                      setMessage(e instanceof Error ? e.message : String(e));
+                    }
+                  }}
+                >
+                  <FileText size={14} /> Tekst (TXT)
+                </button>
+              )}
               {track.status === "SUCCESS" && variant && (
                 <button
                   onClick={() => setPersonaFor(personaFor === track.id ? null : track.id)}
@@ -553,6 +744,7 @@ export default function LibraryView({
       {sections.map((section) => {
         const isCollapsed = section.name !== null && collapsed.has(section.name);
         const busyKey = albumBusy?.startsWith(`${section.name}:`) ? albumBusy : null;
+        const mode = section.name ? albumMode[section.name] ?? "both" : "both";
         return (
           <section key={section.name ?? "__singles__"} className="album-group">
             <div className="album-group-header">
@@ -572,50 +764,44 @@ export default function LibraryView({
               <span className="album-group-count">
                 {section.tracks.length} {plural(section.tracks.length)}
               </span>
-              {section.name && (() => {
-                const maxVariants = Math.max(
-                  1,
-                  ...section.tracks.map((t) => getVariants(t).length)
-                );
-                const albumVar = Math.min(albumVariant[section.name] ?? 0, maxVariants - 1);
-                return (
+              {section.name && (
                 <span className="album-group-actions">
-                  {maxVariants > 1 && (
-                    <span className="variant-switch">
-                      {VARIANT_LETTERS.slice(0, maxVariants).map((L, i) => (
-                        <button
-                          key={L}
-                          className={i === albumVar ? "active" : ""}
-                          title={`Pobieraj wariant ${L} całego albumu`}
-                          onClick={() =>
-                            setAlbumVariant({ ...albumVariant, [section.name!]: i })
-                          }
-                        >
-                          {L}
-                        </button>
-                      ))}
-                    </span>
-                  )}
-                  {albumPlay?.name === section.name ? (
-                    <button onClick={() => setAlbumPlay(null)}>
+                  {playback?.name === section.name ? (
+                    <button onClick={onStopPlayback}>
                       <Square size={13} /> Zatrzymaj
                     </button>
                   ) : (
                     <button
-                      disabled={playableTracks(section.tracks).length === 0}
+                      disabled={buildQueue(section.tracks, mode).length === 0}
                       onClick={() =>
-                        setAlbumPlay({
+                        onPlay({
                           name: section.name!,
-                          trackId: playableTracks(section.tracks)[0].id,
+                          queue: buildQueue(section.tracks, mode),
+                          index: 0,
+                          repeat: false,
                         })
                       }
                     >
                       <Play size={13} /> Odtwórz album
                     </button>
                   )}
+                  <span
+                    className="variant-switch"
+                    title="Które warianty trafiają do kolejki i pobierania"
+                  >
+                    {(["a", "b", "both"] as const).map((m) => (
+                      <button
+                        key={m}
+                        className={mode === m ? "active" : ""}
+                        onClick={() => setAlbumMode({ ...albumMode, [section.name!]: m })}
+                      >
+                        {m === "both" ? "A+B" : m.toUpperCase()}
+                      </button>
+                    ))}
+                  </span>
                   <button
                     disabled={albumBusy !== null}
-                    onClick={() => downloadAlbum(section.name!, section.tracks, "mp3", albumVar)}
+                    onClick={() => downloadAlbum(section.name!, section.tracks, "mp3", mode)}
                   >
                     {busyKey === `${section.name}:mp3` ? (
                       <Loader2 size={13} className="spin" />
@@ -626,7 +812,7 @@ export default function LibraryView({
                   </button>
                   <button
                     disabled={albumBusy !== null}
-                    onClick={() => downloadAlbum(section.name!, section.tracks, "wav", albumVar)}
+                    onClick={() => downloadAlbum(section.name!, section.tracks, "wav", mode)}
                   >
                     {busyKey === `${section.name}:wav` ? (
                       <Loader2 size={13} className="spin" />
@@ -637,7 +823,7 @@ export default function LibraryView({
                   </button>
                   <button
                     disabled={albumBusy !== null}
-                    onClick={() => downloadAlbumCovers(section.name!, section.tracks, albumVar)}
+                    onClick={() => downloadAlbumCovers(section.name!, section.tracks)}
                   >
                     {busyKey === `${section.name}:covers` ? (
                       <Loader2 size={13} className="spin" />
@@ -646,34 +832,52 @@ export default function LibraryView({
                     )}{" "}
                     Okładki
                   </button>
-                </span>
-                );
-              })()}
-            </div>
-            {albumPlay?.name === section.name &&
-              (() => {
-                const current = section.tracks.find((t) => t.id === albumPlay.trackId);
-                const v = current
-                  ? getVariants(current)[variantIndex[current.id] ?? 0]
-                  : undefined;
-                if (!current || !v) return null;
-                return (
-                  <div className="album-player">
-                    <span className="album-player-now">
-                      Teraz: {(current.albumIndex ?? 0) + 1}. {current.title}
+                  <button
+                    disabled={albumBusy !== null}
+                    onClick={() => downloadAlbumLyrics(section.name!, section.tracks)}
+                  >
+                    <FileText size={13} /> Teksty
+                  </button>
+                  <button
+                    disabled={albumBusy !== null}
+                    onClick={async () => {
+                      setMessage(null);
+                      setAlbumBusy(`${section.name}:aicover`);
+                      try {
+                        await onGenerateAlbumCover(section.name!);
+                        setMessage(`Wygenerowano okładkę AI albumu „${section.name}”`);
+                      } catch (e) {
+                        setMessage(e instanceof Error ? e.message : String(e));
+                      } finally {
+                        setAlbumBusy(null);
+                      }
+                    }}
+                  >
+                    {busyKey === `${section.name}:aicover` ? (
+                      <Loader2 size={13} className="spin" />
+                    ) : (
+                      <Sparkles size={13} />
+                    )}{" "}
+                    Okładka AI
+                  </button>
+                  {section.tracks.some((t) => t.aiImagePath) && (
+                    <span className="variant-switch" title="Która okładka albumu jest aktywna">
+                      {(["suno", "ai"] as const).map((m) => (
+                        <button
+                          key={m}
+                          className={(section.tracks[0]?.coverSource ?? "suno") === m ? "active" : ""}
+                          onClick={() =>
+                            onSetCoverSource(section.tracks.map((t) => t.id), m)
+                          }
+                        >
+                          {m === "ai" ? "AI" : "Suno"}
+                        </button>
+                      ))}
                     </span>
-                    <audio
-                      key={current.id}
-                      className="player"
-                      controls
-                      autoPlay
-                      src={v.audioUrl || v.streamAudioUrl}
-                      onEnded={() => advanceAlbum(section.name!, section.tracks)}
-                      onError={() => advanceAlbum(section.name!, section.tracks)}
-                    />
-                  </div>
-                );
-              })()}
+                  )}
+                </span>
+              )}
+            </div>
             {!isCollapsed && (
               <ul className="track-list">{section.tracks.map(renderTrack)}</ul>
             )}

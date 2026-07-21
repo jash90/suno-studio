@@ -74,6 +74,10 @@ export interface Settings {
   openaiAdminKey: string;
   // Domyślny folder zapisu albumów/plików; pusty = pytaj za każdym razem
   defaultSaveDir: string;
+  // Własne prompty systemowe (puste = wbudowany szablon z src/prompts.ts);
+  // brief i poradniki z biblioteki są doklejane automatycznie poza szablonem
+  songSystemPrompt: string;
+  albumSystemPrompt: string;
 }
 
 // Zweryfikowane listy modeli czatowych (stan: 2026-07); wartości spoza listy
@@ -110,6 +114,8 @@ export const DEFAULT_SETTINGS: Settings = {
   anthropicAdminKey: "",
   openaiAdminKey: "",
   defaultSaveDir: "",
+  songSystemPrompt: "",
+  albumSystemPrompt: "",
 };
 
 export interface Balances {
@@ -162,6 +168,20 @@ export interface Album {
   createdAt: string;
 }
 
+/** Pozycja kolejki odtwarzania — jeden wariant jednego utworu. */
+export interface PlayQueueItem {
+  trackId: string;
+  label: string; // "N. Tytuł (A)"
+  url: string;
+}
+
+export interface Playback {
+  name: string; // nazwa albumu / "Kolejka" dla ręcznie budowanej
+  queue: PlayQueueItem[];
+  index: number;
+  repeat: boolean; // po ostatnim utworze wróć do pierwszego
+}
+
 export type TrackStatus =
   | "PENDING"
   | "TEXT_SUCCESS"
@@ -196,6 +216,8 @@ export interface Track {
   album?: string; // nazwa albumu, jeśli utwór powstał w trybie Album
   albumIndex?: number; // numer utworu na płycie (kolejność z planu albumu)
   wavUrl?: string; // URL po jednorazowej konwersji do WAV
+  aiImagePath?: string; // okładka wygenerowana AI — plik PNG w danych aplikacji
+  coverSource?: "suno" | "ai"; // która okładka jest aktywna (domyślnie suno)
   audioUrl?: string;
   streamAudioUrl?: string;
   imageUrl?: string;

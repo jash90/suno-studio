@@ -712,3 +712,81 @@ button.badge {
 .badge-song-written { color: var(--ok); border-color: var(--ok); }
 .badge-song-error { color: var(--error); border-color: var(--error); }
 .badge-song-sent { color: #60a5fa; border-color: #60a5fa; }
+
+/* Odtwarzacz z kolejką (zakładka Odtwarzacz) */
+.album-player.standalone {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.album-player-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.wave-canvas {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.wave-time {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.btn-icon.accent {
+  color: var(--accent);
+}
+
+.album-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+
+.album-queue li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.album-queue li > button:first-child {
+  flex: 1;
+  justify-content: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: left;
+}
+
+.album-queue li > button:first-child.active,
+.album-queue li > button:first-child:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.queue-item-actions {
+  display: inline-flex;
+  gap: 0.1rem;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.album-queue li:hover .queue-item-actions,
+.album-queue li:focus-within .queue-item-actions {
+  opacity: 1;
+}
+
+.queue-item-actions .btn-icon {
+  padding: 0.15rem 0.3rem;
+}

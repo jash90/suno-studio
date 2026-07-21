@@ -1,6 +1,6 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { PersonaModel, SongDraft, SunoModel, TrackStatus, TrackVariant } from "../types";
 
 const BASE = "https://api.sunoapi.org/api/v1";
@@ -213,6 +213,22 @@ export function downloadMp3(url: string, suggestedName: string): Promise<boolean
 
 export function downloadWavFile(url: string, suggestedName: string): Promise<boolean> {
   return downloadWithDialog(url, suggestedName, "wav", "Audio WAV");
+}
+
+/** Zapisuje tekst do .txt — do folderu domyślnego albo przez dialog zapisu.
+ *  Zwraca ścieżkę pliku, albo null gdy użytkownik anulował dialog. */
+export async function saveTextFile(
+  text: string,
+  suggestedName: string,
+  defaultDir: string
+): Promise<string | null> {
+  const fileName = `${sanitizeFileName(suggestedName)}.txt`;
+  const target = defaultDir
+    ? `${defaultDir}/${fileName}`
+    : await save({ defaultPath: fileName, filters: [{ name: "Tekst", extensions: ["txt"] }] });
+  if (!target) return null;
+  await writeTextFile(target, text);
+  return target;
 }
 
 /** Rozszerzenie pliku obrazu z URL-a (fallback jpeg). */
