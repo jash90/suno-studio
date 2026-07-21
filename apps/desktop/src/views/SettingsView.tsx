@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff, FolderOpen } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { getCredits } from "../services/suno";
 import {
   ANTHROPIC_MODELS,
@@ -143,6 +144,36 @@ export default function SettingsView({ settings, onSave }: Props) {
         placeholder="sk-admin-..."
         onChange={(v) => set("openaiAdminKey", v)}
       />
+
+      <h2>Folder zapisu</h2>
+      <p className="hint">
+        Domyślny folder na pobierane albumy i pliki. Gdy ustawiony, pobieranie nie
+        pyta o lokalizację — od razu tworzy podfolder albumu. Puste = pytaj za każdym razem.
+      </p>
+      <div className="key-row">
+        <input
+          type="text"
+          value={form.defaultSaveDir}
+          placeholder="Nie ustawiono — będzie pytać przy pobieraniu"
+          onChange={(e) => set("defaultSaveDir", e.target.value)}
+        />
+        <button
+          className="btn-icon"
+          type="button"
+          title="Wybierz folder"
+          onClick={async () => {
+            const dir = await open({ directory: true, title: "Domyślny folder zapisu" });
+            if (typeof dir === "string") set("defaultSaveDir", dir);
+          }}
+        >
+          <FolderOpen size={16} />
+        </button>
+        {form.defaultSaveDir && (
+          <button type="button" onClick={() => set("defaultSaveDir", "")}>
+            Wyczyść
+          </button>
+        )}
+      </div>
 
       <h2>Domyślne ustawienia</h2>
       <div className="controls-row">

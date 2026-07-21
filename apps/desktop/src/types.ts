@@ -72,6 +72,8 @@ export interface Settings {
   // zwykłe klucze API nie mają dostępu do rozliczeń u żadnego z providerów
   anthropicAdminKey: string;
   openaiAdminKey: string;
+  // Domyślny folder zapisu albumów/plików; pusty = pytaj za każdym razem
+  defaultSaveDir: string;
 }
 
 // Zweryfikowane listy modeli czatowych (stan: 2026-07); wartości spoza listy
@@ -107,6 +109,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showBalances: true,
   anthropicAdminKey: "",
   openaiAdminKey: "",
+  defaultSaveDir: "",
 };
 
 export interface Balances {

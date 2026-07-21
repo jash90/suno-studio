@@ -316,6 +316,21 @@ label {
   gap: 0.3rem;
 }
 
+/* Baner ładowania podczas pobierania albumu — wyróżniony, żeby było jasne, że trwa */
+.info-loading {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  width: 100%;
+  color: var(--accent, #7c6cff);
+  background: color-mix(in srgb, var(--accent, #7c6cff) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #7c6cff) 35%, transparent);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.9rem;
+}
+
 .empty {
   color: var(--muted);
   text-align: center;
@@ -431,12 +446,28 @@ button.badge {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 0.15rem 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.25rem 0.75rem;
 }
 
 .doc-picker-list .checkbox {
-  padding: 0.1rem 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.doc-picker-list .checkbox:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.doc-picker-list .checkbox input {
+  flex-shrink: 0;
 }
 
 .kind-content {

@@ -402,6 +402,7 @@ export default function App() {
           <LibraryView
             tracks={tracks}
             sunoKey={settings.sunoKey}
+            defaultSaveDir={settings.defaultSaveDir}
             onDelete={handleDeleteTrack}
             onCreatePersona={handleCreatePersona}
             onUpdateTrack={updateTrack}

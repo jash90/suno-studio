@@ -12,6 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { mkdir } from "@tauri-apps/plugin-fs";
 import Player from "../components/Player";
 import {
   convertToWav,
@@ -146,6 +147,7 @@ function TrackProgress({ track, now }: { track: Track; now: number }) {
 interface Props {
   tracks: Track[];
   sunoKey: string;
+  defaultSaveDir: string;
   onDelete: (id: string) => void;
   onCreatePersona: (
     track: Track,
@@ -167,6 +169,7 @@ const STATUS_LABELS: Record<Track["status"], string> = {
 export default function LibraryView({
   tracks,
   sunoKey,
+  defaultSaveDir,
   onDelete,
   onCreatePersona,
   onUpdateTrack,
@@ -178,6 +181,8 @@ export default function LibraryView({
   const [now, setNow] = useState(() => Date.now());
   // wybrany wariant per utwór (domyślnie A)
   const [variantIndex, setVariantIndex] = useState<Record<string, number>>({});
+  // wybrany wariant dla pobierania całego albumu, klucz = nazwa albumu (domyślnie A)
+  const [albumVariant, setAlbumVariant] = useState<Record<string, number>>({});
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [albumBusy, setAlbumBusy] = useState<string | null>(null);
   // odtwarzanie albumu po kolei: nazwa albumu + id aktualnego utworu
@@ -207,26 +212,36 @@ export default function LibraryView({
     setCollapsed(next);
   }
 
-  /** Pobiera cały album do wybranego folderu: pliki "NN - Tytuł.mp3/.wav" wg kolejności płyty. */
-  async function downloadAlbum(name: string, list: Track[], format: "mp3" | "wav") {
+  /** Pobiera cały album do wybranego folderu: pliki "NN - Tytuł (A).mp3/.wav" wg kolejności płyty. */
+  async function downloadAlbum(name: string, list: Track[], format: "mp3" | "wav", variantSel: number) {
     setMessage(null);
     const done = list.filter((t) => t.status === "SUCCESS");
     if (done.length === 0) {
       setMessage("Album nie ma jeszcze ukończonych utworów");
       return;
     }
-    const dir = await open({ directory: true, title: `Folder na album „${name}”` });
-    if (!dir) return;
+    const parent =
+      defaultSaveDir ||
+      (await open({ directory: true, title: `Gdzie utworzyć folder albumu „${name}”` }));
+    if (!parent) return;
+    // podfolder z nazwą albumu i oznaczeniem wariantu, np. „Mój Album (A)”
+    const albumLetter = VARIANT_LETTERS[variantSel] ?? String(variantSel + 1);
+    const dir = `${parent}/${sanitizeFileName(name)} (${albumLetter})`;
+    await mkdir(dir, { recursive: true });
     setAlbumBusy(`${name}:${format}`);
     let saved = 0;
     const errors: string[] = [];
     try {
       for (let i = 0; i < done.length; i++) {
         const track = done[i];
-        const variant = getVariants(track)[variantIndex[track.id] ?? 0];
+        const variants = getVariants(track);
+        // gdy utwór nie ma wybranego wariantu (np. tylko A) — bierzemy najbliższy istniejący
+        const vi = Math.min(variantSel, variants.length - 1);
+        const variant = variants[vi];
         if (!variant) continue;
         setMessage(`Pobieranie albumu (${format.toUpperCase()}): ${i + 1}/${done.length} — ${track.title}`);
-        const fileName = `${String((track.albumIndex ?? i) + 1).padStart(2, "0")} - ${sanitizeFileName(track.title)}.${format}`;
+        const letter = VARIANT_LETTERS[vi] ?? String(vi + 1);
+        const fileName = `${String((track.albumIndex ?? i) + 1).padStart(2, "0")} - ${sanitizeFileName(track.title)} (${letter}).${format}`;
         try {
           let url = variant.audioUrl;
           if (format === "wav") {
@@ -256,20 +271,26 @@ export default function LibraryView({
   }
 
   /** Pobiera okładki wszystkich utworów albumu do wybranego folderu. */
-  async function downloadAlbumCovers(name: string, list: Track[]) {
+  async function downloadAlbumCovers(name: string, list: Track[], variantSel: number) {
     setMessage(null);
     const withCovers = list
-      .map((t, i) => ({
-        track: t,
-        order: t.albumIndex ?? i,
-        imageUrl: getVariants(t)[variantIndex[t.id] ?? 0]?.imageUrl ?? t.imageUrl,
-      }))
+      .map((t, i) => {
+        const variants = getVariants(t);
+        const vi = Math.min(variantSel, variants.length - 1);
+        return {
+          track: t,
+          order: t.albumIndex ?? i,
+          imageUrl: variants[vi]?.imageUrl ?? t.imageUrl,
+        };
+      })
       .filter((x) => x.imageUrl);
     if (withCovers.length === 0) {
       setMessage("Album nie ma jeszcze okładek");
       return;
     }
-    const dir = await open({ directory: true, title: `Folder na okładki „${name}”` });
+    const dir =
+      defaultSaveDir ||
+      (await open({ directory: true, title: `Folder na okładki „${name}”` }));
     if (!dir) return;
     setAlbumBusy(`${name}:covers`);
     let saved = 0;
@@ -304,9 +325,15 @@ export default function LibraryView({
   async function download(track: Track, variant: TrackVariant, index: number) {
     if (!variant.audioUrl) return;
     setMessage(null);
+    const label = variantName(track, index);
     try {
-      const saved = await downloadMp3(variant.audioUrl, variantName(track, index));
-      if (saved) setMessage(`Zapisano „${variantName(track, index)}"`);
+      if (defaultSaveDir) {
+        await downloadToPath(variant.audioUrl, `${defaultSaveDir}/${sanitizeFileName(label)}.mp3`);
+        setMessage(`Zapisano „${label}" → ${defaultSaveDir}`);
+      } else {
+        const saved = await downloadMp3(variant.audioUrl, label);
+        if (saved) setMessage(`Zapisano „${label}"`);
+      }
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
     }
@@ -315,6 +342,7 @@ export default function LibraryView({
   async function downloadWav(track: Track, variant: TrackVariant, index: number) {
     setMessage(null);
     setWavBusy(track.id);
+    const label = variantName(track, index);
     try {
       // konwersja jest jednorazowa per wariant — zapamiętany URL pozwala pobierać od razu
       let url = variant.wavUrl;
@@ -325,8 +353,13 @@ export default function LibraryView({
         );
         onUpdateTrack(track.id, { variants });
       }
-      const saved = await downloadWavFile(url, variantName(track, index));
-      if (saved) setMessage(`Zapisano WAV „${variantName(track, index)}"`);
+      if (defaultSaveDir) {
+        await downloadToPath(url, `${defaultSaveDir}/${sanitizeFileName(label)}.wav`);
+        setMessage(`Zapisano WAV „${label}" → ${defaultSaveDir}`);
+      } else {
+        const saved = await downloadWavFile(url, label);
+        if (saved) setMessage(`Zapisano WAV „${label}"`);
+      }
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -450,11 +483,17 @@ export default function LibraryView({
                 <button
                   onClick={async () => {
                     try {
-                      const saved = await downloadImageFile(
-                        variant.imageUrl!,
-                        variantName(track, selectedIndex)
-                      );
-                      if (saved) setMessage(`Zapisano okładkę „${track.title}"`);
+                      const label = variantName(track, selectedIndex);
+                      if (defaultSaveDir) {
+                        await downloadToPath(
+                          variant.imageUrl!,
+                          `${defaultSaveDir}/${sanitizeFileName(label)}.${imageExt(variant.imageUrl!)}`
+                        );
+                        setMessage(`Zapisano okładkę „${track.title}" → ${defaultSaveDir}`);
+                      } else {
+                        const saved = await downloadImageFile(variant.imageUrl!, label);
+                        if (saved) setMessage(`Zapisano okładkę „${track.title}"`);
+                      }
                     } catch (e) {
                       setMessage(e instanceof Error ? e.message : String(e));
                     }
@@ -503,7 +542,14 @@ export default function LibraryView({
 
   return (
     <div className="view">
-      {message && <p className="info">{message}</p>}
+      {message &&
+        (albumBusy ? (
+          <p className="info info-loading">
+            <Loader2 size={15} className="spin" /> {message}
+          </p>
+        ) : (
+          <p className="info">{message}</p>
+        ))}
       {sections.map((section) => {
         const isCollapsed = section.name !== null && collapsed.has(section.name);
         const busyKey = albumBusy?.startsWith(`${section.name}:`) ? albumBusy : null;
@@ -526,8 +572,30 @@ export default function LibraryView({
               <span className="album-group-count">
                 {section.tracks.length} {plural(section.tracks.length)}
               </span>
-              {section.name && (
+              {section.name && (() => {
+                const maxVariants = Math.max(
+                  1,
+                  ...section.tracks.map((t) => getVariants(t).length)
+                );
+                const albumVar = Math.min(albumVariant[section.name] ?? 0, maxVariants - 1);
+                return (
                 <span className="album-group-actions">
+                  {maxVariants > 1 && (
+                    <span className="variant-switch">
+                      {VARIANT_LETTERS.slice(0, maxVariants).map((L, i) => (
+                        <button
+                          key={L}
+                          className={i === albumVar ? "active" : ""}
+                          title={`Pobieraj wariant ${L} całego albumu`}
+                          onClick={() =>
+                            setAlbumVariant({ ...albumVariant, [section.name!]: i })
+                          }
+                        >
+                          {L}
+                        </button>
+                      ))}
+                    </span>
+                  )}
                   {albumPlay?.name === section.name ? (
                     <button onClick={() => setAlbumPlay(null)}>
                       <Square size={13} /> Zatrzymaj
@@ -547,7 +615,7 @@ export default function LibraryView({
                   )}
                   <button
                     disabled={albumBusy !== null}
-                    onClick={() => downloadAlbum(section.name!, section.tracks, "mp3")}
+                    onClick={() => downloadAlbum(section.name!, section.tracks, "mp3", albumVar)}
                   >
                     {busyKey === `${section.name}:mp3` ? (
                       <Loader2 size={13} className="spin" />
@@ -558,7 +626,7 @@ export default function LibraryView({
                   </button>
                   <button
                     disabled={albumBusy !== null}
-                    onClick={() => downloadAlbum(section.name!, section.tracks, "wav")}
+                    onClick={() => downloadAlbum(section.name!, section.tracks, "wav", albumVar)}
                   >
                     {busyKey === `${section.name}:wav` ? (
                       <Loader2 size={13} className="spin" />
@@ -569,7 +637,7 @@ export default function LibraryView({
                   </button>
                   <button
                     disabled={albumBusy !== null}
-                    onClick={() => downloadAlbumCovers(section.name!, section.tracks)}
+                    onClick={() => downloadAlbumCovers(section.name!, section.tracks, albumVar)}
                   >
                     {busyKey === `${section.name}:covers` ? (
                       <Loader2 size={13} className="spin" />
@@ -579,7 +647,8 @@ export default function LibraryView({
                     Okładki
                   </button>
                 </span>
-              )}
+                );
+              })()}
             </div>
             {albumPlay?.name === section.name &&
               (() => {
