@@ -592,6 +592,11 @@ button.badge {
    raz. */
 .variant-switch {
   display: inline-flex;
+  /* Kontrolka ma mieć szerokość swojej treści. Bez tego w kolumnowym flexie
+     (karta utworu) rozciągała się przez `align-items: stretch` na całą
+     szerokość karty — niewidoczne, dopóki nie dostała obramowania. */
+  align-self: flex-start;
+  width: fit-content;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
