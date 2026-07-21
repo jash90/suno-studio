@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.bartlomiejzimny.suno-studio",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "node_modules/.bin/vite",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "node_modules/.bin/tsc && node_modules/.bin/vite build",
     "frontendDist": "../dist"
   },
   "app": {
