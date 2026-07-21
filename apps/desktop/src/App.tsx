@@ -21,7 +21,7 @@ import {
   saveTracks,
 } from "./services/storage";
 import { generateSong } from "./services/llm";
-import { generateTrackCover } from "./services/cover";
+import { generateTrackCover, removeCover } from "./services/cover";
 import { buildContext, retrieveChunks } from "./services/rag";
 import { createPersona, createTask, getTaskStatus, pollTask } from "./services/suno";
 import {
@@ -394,6 +394,25 @@ export default function App() {
     if (errors.length > 0) throw new Error(`Błędy: ${errors.join("; ")}`);
   }
 
+  /** Kasuje okładki AI wskazanych utworów — pliki z dysku i wpisy na trackach. */
+  async function handleResetCovers(ids: string[]) {
+    const withCovers = tracksRef.current.filter(
+      (t) => ids.includes(t.id) && t.aiImagePath
+    );
+    if (withCovers.length === 0) throw new Error("Brak okładek AI do zresetowania");
+    for (const t of withCovers) await removeCover(t.aiImagePath!);
+    const resetIds = withCovers.map((t) => t.id);
+    setTracks((prev) => {
+      const next = prev.map((t) =>
+        resetIds.includes(t.id)
+          ? { ...t, aiImagePath: undefined, coverSource: "suno" as const }
+          : t
+      );
+      void saveTracks(next);
+      return next;
+    });
+  }
+
   function handleSetCoverSource(ids: string[], source: "suno" | "ai") {
     setTracks((prev) => {
       const next = prev.map((t) => (ids.includes(t.id) ? { ...t, coverSource: source } : t));
@@ -512,6 +531,7 @@ export default function App() {
             onGenerateCover={handleGenerateCover}
             onGenerateAlbumCovers={handleGenerateAlbumCovers}
             onSetCoverSource={handleSetCoverSource}
+            onResetCovers={handleResetCovers}
           />
         </div>
         <div className={view === "player" ? "" : "hidden"}>

@@ -1,7 +1,7 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { copyFile, mkdir, writeFile } from "@tauri-apps/plugin-fs";
+import { copyFile, mkdir, remove, writeFile } from "@tauri-apps/plugin-fs";
 import { Track } from "../types";
 
 // Okładki AI przez OpenAI Images API (gpt-image-1.5) — obok okładek Suno.
@@ -77,6 +77,15 @@ export async function generateTrackCover(
 /** Adres pliku okładki dla <img> — asset:// zamiast ścieżki systemowej. */
 export function coverSrc(path: string): string {
   return convertFileSrc(path);
+}
+
+/** Kasuje plik okładki AI; brak pliku nie jest błędem (mógł zniknąć wcześniej). */
+export async function removeCover(path: string): Promise<void> {
+  try {
+    await remove(path);
+  } catch {
+    /* nic — wpis na tracku i tak znika */
+  }
 }
 
 /** Kopiuje zapisaną okładkę AI pod wskazaną ścieżkę docelową. */

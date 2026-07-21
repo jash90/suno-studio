@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronRight,
   Disc3,
+  Eraser,
   Download,
   FileAudio,
   FileText,
@@ -15,7 +16,7 @@ import {
   Square,
   UserRound,
 } from "lucide-react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { confirm, open } from "@tauri-apps/plugin-dialog";
 import { mkdir } from "@tauri-apps/plugin-fs";
 import Player from "../components/Player";
 import { coverSrc, saveCoverAs } from "../services/cover";
@@ -195,6 +196,7 @@ interface Props {
     onProgress: (done: number, total: number) => void
   ) => Promise<void>;
   onSetCoverSource: (ids: string[], source: "suno" | "ai") => void;
+  onResetCovers: (ids: string[]) => Promise<void>;
 }
 
 const STATUS_LABELS: Record<Track["status"], string> = {
@@ -220,6 +222,7 @@ export default function LibraryView({
   onGenerateCover,
   onGenerateAlbumCovers,
   onSetCoverSource,
+  onResetCovers,
 }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [personaFor, setPersonaFor] = useState<string | null>(null);
@@ -654,6 +657,26 @@ export default function LibraryView({
                   ))}
                 </span>
               )}
+              {track.aiImagePath && (
+                <button
+                  title="Usuń okładkę AI tego utworu"
+                  disabled={coverBusy === track.id}
+                  onClick={async () => {
+                    setMessage(null);
+                    setCoverBusy(track.id);
+                    try {
+                      await onResetCovers([track.id]);
+                      setMessage(`Usunięto okładkę AI „${track.title}"`);
+                    } catch (e) {
+                      setMessage(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setCoverBusy(null);
+                    }
+                  }}
+                >
+                  <Eraser size={14} /> Reset okładki
+                </button>
+              )}
               {track.status === "FAILED" && (
                 <button
                   disabled={retryBusy === track.id}
@@ -881,6 +904,37 @@ export default function LibraryView({
                         </button>
                       ))}
                     </span>
+                  )}
+                  {section.tracks.some((t) => t.aiImagePath) && (
+                    <button
+                      disabled={albumBusy !== null}
+                      title="Usuń wszystkie okładki AI tego albumu"
+                      onClick={async () => {
+                        const withCovers = section.tracks.filter((t) => t.aiImagePath);
+                        const ok = await confirm(
+                          `Usunąć okładki AI albumu „${section.name}” (${withCovers.length} ${plural(withCovers.length)})? Ponowne wygenerowanie kosztuje w OpenAI.`,
+                          { title: "Reset okładek AI", kind: "warning" }
+                        );
+                        if (!ok) return;
+                        setMessage(null);
+                        setAlbumBusy(`${section.name}:reset`);
+                        try {
+                          await onResetCovers(section.tracks.map((t) => t.id));
+                          setMessage(`Usunięto okładki AI albumu „${section.name}”`);
+                        } catch (e) {
+                          setMessage(e instanceof Error ? e.message : String(e));
+                        } finally {
+                          setAlbumBusy(null);
+                        }
+                      }}
+                    >
+                      {busyKey === `${section.name}:reset` ? (
+                        <Loader2 size={13} className="spin" />
+                      ) : (
+                        <Eraser size={13} />
+                      )}{" "}
+                      Reset okładek
+                    </button>
                   )}
                 </span>
               )}
