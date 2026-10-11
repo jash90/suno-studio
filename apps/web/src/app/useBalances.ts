@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { useAction } from "convex/react";
-import { api } from "@suno/backend/api";
 import { Balances } from "@suno/core";
 
 /** Salda (kredyty Suno, wydatki AI) — po załadowaniu danych i cyklicznie co 10 min. */
-export function useBalances(ready: boolean) {
-  const fetchBalances = useAction(api.balances.fetch_);
+export function useBalances(fetchBalances: () => Promise<Balances>, ready: boolean) {
   const [balances, setBalances] = useState<Balances>({});
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      setBalances(await fetchBalances({}));
+      setBalances(await fetchBalances());
     } finally {
       setRefreshing(false);
     }

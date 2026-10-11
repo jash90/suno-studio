@@ -9,3 +9,4 @@ export * from "./integrations/suno";
 export * from "./integrations/llmClient";
 export * from "./integrations/images";
 export * from "./integrations/balances";
+export * from "./trackOps";

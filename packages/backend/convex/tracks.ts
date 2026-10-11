@@ -3,7 +3,14 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { canRegenerate, getVariants, Track } from "@suno/core";
+import {
+  applyTaskUpdate,
+  canRegenerate,
+  getVariants,
+  patchVariant,
+  Track,
+  TrackVariant,
+} from "@suno/core";
 import { findTrackRow, releaseCoverFile } from "./lib/trackRows";
 import { trackClientPatch } from "./validators";
 
@@ -120,19 +127,6 @@ export const claimRegenerationInternal = internalMutation({
   },
 });
 
-/** Ustawia `fields` i usuwa `clear` (opcjonalnie tylko klucze z `only`). */
-function merge<T extends object>(
-  obj: T,
-  fields: Record<string, unknown>,
-  clear: string[],
-  only?: string[]
-): T {
-  const next = { ...obj } as Record<string, unknown>;
-  for (const [k, val] of Object.entries(fields)) if (!only || only.includes(k)) next[k] = val;
-  for (const k of clear) if (!only || only.includes(k)) delete next[k];
-  return next as T;
-}
-
 /** Merguje pola jednego wariantu w transakcji — archiwizacja i konwersja WAV
  *  działają równolegle, więc nadpisywanie całej tablicy variants gubiłoby zmiany.
  *  `clear` usuwa pola (merge nie umie ich wyczyścić). Wariant 0 jest lustrzany
@@ -148,15 +142,9 @@ export const patchVariantInternal = internalMutation({
   handler: async (ctx, { userId, domainId, audioId, fields, clear = [] }): Promise<boolean> => {
     const row = await findRow(ctx, userId, domainId);
     if (!row) return false;
-    const track = row.data as Track;
-    const variants = (track.variants ?? []).map((variant) =>
-      variant.audioId === audioId ? merge(variant, fields, clear) : variant
-    );
-    let next: Track = { ...track, variants };
-    if (track.audioId === audioId) {
-      next = merge(next, fields, clear, ["audioUrl", "streamAudioUrl", "wavUrl"]);
-    }
-    await ctx.db.patch(row._id, { data: next });
+    await ctx.db.patch(row._id, {
+      data: patchVariant(row.data as Track, audioId, fields, clear as (keyof TrackVariant)[]),
+    });
     return true;
   },
 });
@@ -196,10 +184,9 @@ export const applyTaskUpdateInternal = internalMutation({
     const row = await findRow(ctx, userId, domainId);
     if (!row) return null;
     const track = row.data as Track;
-    if (track.taskId !== taskId || track.status === "SUCCESS" || track.status === "FAILED") {
-      return track.status;
-    }
-    await ctx.db.patch(row._id, { data: { ...track, ...update } });
+    const next = applyTaskUpdate(track, taskId, update);
+    if (!next) return track.status;
+    await ctx.db.patch(row._id, { data: next });
     if (update.status === "SUCCESS") {
       // Suno kasuje pliki po 14 dniach — od razu kopiujemy je do Convex storage
       await ctx.scheduler.runAfter(0, internal.archive.archiveTrack, {

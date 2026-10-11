@@ -1,3 +1,5 @@
+import type { LocalIO } from "../data/local/LocalStudio";
+
 // Kontrakt funkcji zależnych od platformy. Jedna implementacja trafia do bundla
 // przez alias `@platform` (vite.config.ts): web.ts albo tauri.ts. Reszta UI zna
 // wyłącznie ten interfejs — żadnych importów @tauri-apps/* poza platform/tauri.ts.
@@ -17,33 +19,24 @@ export interface BundleResult {
   location: string | null;
 }
 
-/** Dane z lokalnych plików starej aplikacji desktopowej (przed migracją na Convex). */
-export interface LegacyDesktopData {
-  settings: Record<string, unknown> | null;
-  tracks: Record<string, unknown>[];
-  library: Record<string, unknown>[];
-  personas: Record<string, unknown>[];
-  album: Record<string, unknown> | null;
-  /** Okładki AI: aiImagePath (ścieżka z history.json) → plik PNG. */
-  covers: Map<string, Blob>;
-}
-
-/** Funkcje dostępne tylko w powłoce desktopowej. */
-export interface DesktopFeatures {
-  /** Domyślny folder zapisu — ustawienie tej maszyny, nie konta (nie trafia do Convex). */
+/** Funkcje dostępne tylko w powłoce desktopowej. Rozszerza LocalIO — wejście/wyjście
+ *  lokalnego silnika danych (data/local/LocalStudio). */
+export interface DesktopFeatures extends LocalIO {
+  /** Domyślny folder zapisu — ustawienie tej maszyny. */
   getDefaultSaveDir(): Promise<string>;
   setDefaultSaveDir(dir: string): Promise<void>;
   pickDirectory(title: string): Promise<string | null>;
-  /** Jednorazowy import danych z plików tauri-plugin-store sprzed migracji. */
-  readLegacyData(): Promise<LegacyDesktopData | null>;
-  markLegacyImported(): Promise<void>;
+  /** Katalog danych aplikacji (pliki JSON, audio/, covers/). */
+  dataDir(): Promise<string>;
+  fileSize(path: string): Promise<number>;
+  revealDataDir(): Promise<void>;
 }
 
 export interface Platform {
   kind: "web" | "desktop";
   /** Uruchamiane raz przy starcie (web: rejestracja service workera PWA). */
   init(): void;
-  /** Token Convex Auth — web potrzebuje go dla proxy /download. */
+  /** Token Convex Auth — web potrzebuje go dla proxy /download (desktop: no-op). */
   setAuthToken(token: string | null): void;
   /** Pobiera plik binarny (CDN Suno, Convex storage) z obejściem CORS. */
   fetchBlob(url: string): Promise<Blob>;

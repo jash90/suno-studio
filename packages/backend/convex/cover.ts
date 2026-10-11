@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { action, ActionCtx, internalAction, internalMutation, mutation } from "./_generated/server";
-import { coverPrompt, generateCoverImage, Track } from "@suno/core";
+import { coverPrompt, generateCoverImage, Track, withoutAiCover } from "@suno/core";
 import { findTrackRow, releaseCoverFile, rowsOfUser } from "./lib/trackRows";
 import { consume } from "./limits";
 import { requireSettings } from "./suno";
@@ -150,15 +150,7 @@ export const reset = mutation({
       const track = row.data as Track;
       if (!track.aiImageUrl && !track.coverStatus) continue;
       if (track.aiImageStorageId) files.add(track.aiImageStorageId);
-      const {
-        aiImageUrl: _u,
-        aiImageStorageId: _id,
-        coverSource: _src,
-        coverStatus: _s,
-        coverError: _e,
-        ...rest
-      } = track;
-      await ctx.db.patch(row._id, { data: rest });
+      await ctx.db.patch(row._id, { data: withoutAiCover(track) });
       count++;
     }
     if (count === 0) throw new Error("Brak okładek AI do zresetowania");

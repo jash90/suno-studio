@@ -1,24 +1,41 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { appDataDir, join } from "@tauri-apps/api/path";
 import { confirm as askConfirm, open, save } from "@tauri-apps/plugin-dialog";
-import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
+import { mkdir, readFile, remove, stat, writeFile } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { load, Store } from "@tauri-apps/plugin-store";
 import { check } from "@tauri-apps/plugin-updater";
 import { sanitizeFileName } from "@suno/core";
 import { withBusy } from "./busy";
-import type { BundleFile, LegacyDesktopData, Platform } from "./types";
+import type { BundleFile, DesktopFeatures, Platform } from "./types";
 
-// Powłoka desktopowa (apps/desktop). Pobieranie idzie przez plugin-http (proces Rust)
-// — webview nie dostaje nagłówków CORS ze wszystkich CDN-ów Suno; zapis bezpośrednio
-// na dysk (domyślny folder albo dialog), album → podfolder zamiast ZIP-a.
+// Powłoka desktopowa (apps/desktop). Dane studia leżą lokalnie (data/local/LocalStudio):
+// pliki JSON tauri-plugin-store + audio/ i covers/ w katalogu danych aplikacji.
+// Sieć przez plugin-http (proces Rust) — bez CORS; zapis plików bezpośrednio na dysk.
 
-let deviceStore: Store | null = null;
-async function device(): Promise<Store> {
-  if (!deviceStore) deviceStore = await load("device.json");
-  return deviceStore;
+const stores = new Map<string, Promise<Store>>();
+function store(file: string): Promise<Store> {
+  if (!stores.has(file)) stores.set(file, load(file));
+  return stores.get(file)!;
+}
+
+/** Ścieżka pliku z adresu protokołu asset (convertFileSrc) albo null. */
+function assetPath(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "asset:" && u.hostname !== "asset.localhost") return null;
+    return decodeURIComponent(u.pathname.slice(1));
+  } catch {
+    return null;
+  }
 }
 
 async function fetchBlob(url: string): Promise<Blob> {
+  // pliki z archiwum na dysku — czytamy wprost, bez HTTP
+  const local = assetPath(url);
+  if (local) return new Blob([await readFile(local)]);
   const res = await tauriFetch(url);
   if (!res.ok) throw new Error(`Pobieranie nie powiodło się (HTTP ${res.status})`);
   return new Blob([await res.arrayBuffer()], {
@@ -34,11 +51,10 @@ async function toBytes(source: { url?: string; data?: Blob | string }): Promise<
 }
 
 async function getDefaultSaveDir(): Promise<string> {
-  const store = await device();
-  const dir = await store.get<string>("defaultSaveDir");
+  const dir = await (await store("device.json")).get<string>("defaultSaveDir");
   if (dir !== undefined) return dir;
-  // pierwsze uruchomienie po migracji — przejmij folder z dawnych ustawień
-  const legacy = await (await load("settings.json")).get<{ defaultSaveDir?: string }>("settings");
+  // dawna wersja desktopowa trzymała folder w ustawieniach
+  const legacy = await (await store("settings.json")).get<{ defaultSaveDir?: string }>("settings");
   return legacy?.defaultSaveDir ?? "";
 }
 
@@ -65,9 +81,60 @@ async function checkForUpdate() {
   }
 }
 
-async function readJson<T>(file: string, key: string): Promise<T | undefined> {
-  return (await load(file)).get<T>(key);
-}
+const desktop: DesktopFeatures = {
+  http: (input, init) => tauriFetch(input, init),
+
+  async readStore<T>(file: string, key: string) {
+    return (await store(file)).get<T>(key);
+  },
+
+  async writeStore(file, key, value) {
+    const s = await store(file);
+    await s.set(key, value);
+    await s.save();
+  },
+
+  async writeDataFile(relativePath, data) {
+    const path = await join(await appDataDir(), relativePath);
+    const dir = path.slice(0, path.lastIndexOf("/"));
+    await mkdir(dir, { recursive: true });
+    await writeFile(path, new Uint8Array(await data.arrayBuffer()));
+    return path;
+  },
+
+  async removeFile(path) {
+    await remove(path);
+  },
+
+  fileUrl: (path) => convertFileSrc(path),
+
+  dataDir: () => appDataDir(),
+
+  async fileSize(path) {
+    try {
+      return (await stat(path)).size;
+    } catch {
+      return 0;
+    }
+  },
+
+  async revealDataDir() {
+    await revealItemInDir(await join(await appDataDir(), "history.json"));
+  },
+
+  getDefaultSaveDir,
+
+  async setDefaultSaveDir(dir) {
+    const s = await store("device.json");
+    await s.set("defaultSaveDir", dir);
+    await s.save();
+  },
+
+  async pickDirectory(title) {
+    const dir = await open({ directory: true, recursive: true, title });
+    return typeof dir === "string" ? dir : null;
+  },
+};
 
 const tauriPlatform: Platform = {
   kind: "desktop",
@@ -77,7 +144,7 @@ const tauriPlatform: Platform = {
   },
 
   setAuthToken() {
-    // plugin-http nie potrzebuje proxy Convex — token zbędny
+    // desktop nie używa Convex — brak tokenu
   },
 
   fetchBlob,
@@ -105,7 +172,7 @@ const tauriPlatform: Platform = {
     return withBusy(async () => {
       const parent =
         (await getDefaultSaveDir()) ||
-        (await open({ directory: true, title: `Gdzie zapisać „${bundleName}”` }));
+        (await open({ directory: true, recursive: true, title: `Gdzie zapisać „${bundleName}”` }));
       if (!parent || Array.isArray(parent)) return { saved: 0, errors: [], location: null };
       const dir = `${parent}/${sanitizeFileName(bundleName)}`;
       await mkdir(dir, { recursive: true });
@@ -129,52 +196,7 @@ const tauriPlatform: Platform = {
     return askConfirm(message, { title: title ?? "Suno Studio", kind: "warning" });
   },
 
-  desktop: {
-    getDefaultSaveDir,
-
-    async setDefaultSaveDir(dir) {
-      const store = await device();
-      await store.set("defaultSaveDir", dir);
-      await store.save();
-    },
-
-    async pickDirectory(title) {
-      const dir = await open({ directory: true, title });
-      return typeof dir === "string" ? dir : null;
-    },
-
-    async readLegacyData(): Promise<LegacyDesktopData | null> {
-      if (await (await device()).get<boolean>("legacyImported")) return null;
-      const tracks = (await readJson<Record<string, unknown>[]>("history.json", "tracks")) ?? [];
-      const library = (await readJson<Record<string, unknown>[]>("library.json", "docs")) ?? [];
-      const personas =
-        (await readJson<Record<string, unknown>[]>("personas.json", "personas")) ?? [];
-      const album = (await readJson<Record<string, unknown>>("album.json", "album")) ?? null;
-      const settings =
-        (await readJson<Record<string, unknown>>("settings.json", "settings")) ?? null;
-      if (!tracks.length && !library.length && !personas.length && !album) return null;
-
-      const covers = new Map<string, Blob>();
-      for (const track of tracks) {
-        const path = track.aiImagePath;
-        if (typeof path !== "string" || covers.has(path)) continue;
-        try {
-          if (await exists(path)) {
-            covers.set(path, new Blob([await readFile(path)], { type: "image/png" }));
-          }
-        } catch {
-          // brak pliku okładki — utwór zaimportuje się z okładką Suno
-        }
-      }
-      return { settings, tracks, library, personas, album, covers };
-    },
-
-    async markLegacyImported() {
-      const store = await device();
-      await store.set("legacyImported", true);
-      await store.save();
-    },
-  },
+  desktop,
 };
 
 export default tauriPlatform;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import {
   Disc3,
   FolderOpen,
@@ -8,40 +8,30 @@ import {
   Settings as SettingsIcon,
   Sparkles,
 } from "lucide-react";
-import { useAction, useMutation, useQuery } from "convex/react";
-import { useAuthActions, useAuthToken } from "@convex-dev/auth/react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { api } from "@suno/backend/api";
-import platform from "@platform";
+import { PersonaModel, Playback, Provider, SongDraft, SunoModel } from "@suno/core";
 import BalanceBar from "../components/BalanceBar";
+import type { StudioBackend } from "../data/types";
 import AlbumView from "../views/AlbumView";
 import CreateView from "../views/CreateView";
 import FilesView from "../views/FilesView";
 import LibraryView from "../views/library/LibraryView";
 import PlayerView from "../views/PlayerView";
 import SettingsView from "../views/SettingsView";
-import {
-  Album,
-  AlbumConcept,
-  AlbumSong,
-  DEFAULT_SETTINGS,
-  LibraryDoc,
-  PersonaModel,
-  Playback,
-  Provider,
-  Settings,
-  SongDraft,
-  SunoModel,
-} from "@suno/core";
 import { pathToView, View, VIEW_PATHS } from "./navigation";
 import { useBalances } from "./useBalances";
-import { useLatest } from "./useLatest";
 
-export default function Studio() {
-  const { signOut } = useAuthActions();
-  // Proxy /download (web) wymaga tokenu — przekazujemy aktualny do warstwy platformy
-  const authToken = useAuthToken();
-  useEffect(() => platform.setAuthToken(authToken ?? null), [authToken]);
+interface Props {
+  /** Źródło danych: Convex (web) albo lokalny silnik (desktop) */
+  backend: StudioBackend;
+  /** Dodatkowe sekcje Ustawień zależne od wersji (konto / dane lokalne) */
+  settingsExtras?: ReactNode;
+  /** Web: wylogowanie; desktop nie ma konta */
+  onSignOut?: () => void;
+}
+
+export default function Studio({ backend, settingsExtras, onSignOut }: Props) {
+  const { data, actions } = backend;
   // Widok wynika z URL-a; złe/nieznane ścieżki normalizujemy efektem (nie
   // <Navigate>), żeby ani na jeden render nie odmontować zawsze-żywych widoków.
   const { pathname } = useLocation();
@@ -62,55 +52,17 @@ export default function Studio() {
     });
   }
 
-  const settingsData = useLatest(useQuery(api.settings.get));
-  const tracks = useLatest(useQuery(api.tracks.list));
-  const library = useLatest(useQuery(api.library.list));
-  const personas = useLatest(useQuery(api.personas.list));
-  const album = useLatest(useQuery(api.album.get));
+  const ready = data !== undefined;
+  const {
+    balances,
+    refreshing: balancesRefreshing,
+    refresh: refreshBalances,
+  } = useBalances(actions.fetchBalances, ready);
 
-  const saveSettingsM = useMutation(api.settings.save);
-  const removeTrackM = useMutation(api.tracks.remove);
-  const patchTrackM = useMutation(api.tracks.patch);
-  const addLibraryM = useMutation(api.library.add);
-  const setKindM = useMutation(api.library.setKind);
-  const removeLibraryM = useMutation(api.library.remove);
-  const setAlbumM = useMutation(api.album.set);
-  const patchSongM = useMutation(api.album.patchSong);
+  if (!data) return <div className="app-loading">Wczytywanie...</div>;
+  const { settings, tracks, library, personas, album } = data;
 
-  const writeSongA = useAction(api.generate.generateSongAction);
-  const startGenA = useAction(api.suno.startGeneration);
-  const retryGenA = useAction(api.suno.retryGeneration);
-  const regenerateA = useAction(api.suno.regenerateExpired);
-  const convertWavA = useAction(api.suno.convertToWav);
-  const genCoverA = useAction(api.cover.generateTrackCover);
-  const genAlbumCoversM = useMutation(api.cover.generateAlbumCovers);
-  const resetCoversM = useMutation(api.cover.reset);
-  const createPersonaA = useAction(api.suno.createPersona);
-  const getCreditsA = useAction(api.suno.getCredits);
-  const planAlbumA = useAction(api.album.plan);
-  const writeAlbumA = useAction(api.album.writeLyrics);
-
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...(settingsData ?? {}) };
-  const ready =
-    settingsData !== undefined &&
-    tracks !== undefined &&
-    library !== undefined &&
-    personas !== undefined &&
-    album !== undefined;
-
-  const { balances, refreshing: balancesRefreshing, refresh: refreshBalances } = useBalances(ready);
-
-  async function handleWriteLyrics(params: {
-    brief: string;
-    useLibrary: boolean;
-    excludedIds: string[];
-    provider: Provider;
-    sunoModel: SunoModel;
-  }): Promise<{ draft: SongDraft; usedSources: string | null }> {
-    return writeSongA(params);
-  }
-
-  async function handleGenerateMusic(
+  async function generateMusic(
     draft: SongDraft,
     sunoModel: SunoModel,
     provider: Provider,
@@ -119,7 +71,7 @@ export default function Studio() {
     albumTitle?: string,
     albumIndex?: number
   ): Promise<string> {
-    const trackId = await startGenA({
+    const trackId = await actions.startGeneration({
       draft,
       sunoModel,
       provider,
@@ -132,67 +84,8 @@ export default function Studio() {
     return trackId;
   }
 
-  async function handlePlanAlbum(params: {
-    brief: string;
-    songCount: number;
-    provider: Provider;
-    useLibrary: boolean;
-    excludedIds: string[];
-  }): Promise<AlbumConcept> {
-    return planAlbumA(params);
-  }
-
-  async function handleWriteAlbumLyrics(
-    provider: Provider,
-    sunoModel: SunoModel,
-    useLibrary: boolean,
-    excludedIds: string[]
-  ): Promise<void> {
-    try {
-      await writeAlbumA({ provider, sunoModel, useLibrary, excludedIds });
-    } catch {
-      // błąd pojedynczej piosenki zapisuje się w jej statusie; całość nie przerywa UI
-    }
-  }
-
-  function handleAlbumChange(next: Album | null) {
-    void setAlbumM({ album: next });
-  }
-
-  function patchAlbumSong(index: number, patch: Partial<AlbumSong>) {
-    void patchSongM({ index, patch });
-  }
-
-  async function handleSaveSettings(next: Settings) {
-    await saveSettingsM({ settings: next });
-    void refreshBalances(); // klucze mogły się zmienić
-  }
-
-  function handleLibraryAdd(docs: LibraryDoc[]) {
-    for (const doc of docs) void addLibraryM({ doc });
-  }
-
-  function handleToggleKind(id: string) {
-    const doc = (library ?? []).find((d) => d.id === id);
-    if (!doc) return;
-    void setKindM({ domainId: id, kind: doc.kind === "guide" ? "content" : "guide" });
-  }
-
-  async function handleCreatePersona(
-    track: { id: string },
-    audioId: string,
-    name: string,
-    description: string
-  ) {
-    await createPersonaA({ domainId: track.id, audioId, name, description });
-  }
-
   const albumWriting = album?.songs.some((s) => s.status === "writing") ?? false;
-  const pendingCount = (tracks ?? []).filter(
-    (t) => t.status !== "SUCCESS" && t.status !== "FAILED"
-  ).length;
-
-  if (!ready) return <div className="app-loading">Wczytywanie...</div>;
+  const pendingCount = tracks.filter((t) => t.status !== "SUCCESS" && t.status !== "FAILED").length;
 
   // Jedno źródło zakładek dla górnego paska (desktop) i dolnego (mobile)
   const tabs: {
@@ -204,7 +97,7 @@ export default function Studio() {
   }[] = [
     { id: "create", label: "Twórz", Icon: Sparkles },
     { id: "album", label: "Album", Icon: Disc3 },
-    { id: "files", label: "Pliki", Icon: FolderOpen, count: library!.length },
+    { id: "files", label: "Pliki", Icon: FolderOpen, count: library.length },
     { id: "library", label: "Biblioteka", Icon: ListMusic, count: pendingCount },
     { id: "player", label: "Odtwarzacz", Icon: Headphones, dot: playback !== null },
     { id: "settings", label: "Ustawienia", Icon: SettingsIcon },
@@ -237,9 +130,11 @@ export default function Studio() {
               {dot ? " ♪" : ""}
             </button>
           ))}
-          <button className="btn-icon" title="Wyloguj" onClick={() => void signOut()}>
-            <LogOut size={16} />
-          </button>
+          {onSignOut && (
+            <button className="btn-icon" title="Wyloguj" onClick={onSignOut}>
+              <LogOut size={16} />
+            </button>
+          )}
         </nav>
       </header>
       <main>
@@ -248,32 +143,40 @@ export default function Studio() {
         <div className={view === "create" ? "" : "hidden"}>
           <CreateView
             settings={settings}
-            library={library!}
-            personas={personas!}
-            onWriteLyrics={handleWriteLyrics}
-            onGenerateMusic={handleGenerateMusic}
+            library={library}
+            personas={personas}
+            onWriteLyrics={actions.writeSong}
+            onGenerateMusic={generateMusic}
           />
         </div>
         <div className={view === "album" ? "" : "hidden"}>
           <AlbumView
             settings={settings}
-            library={library!}
-            personas={personas!}
-            album={album!}
+            library={library}
+            personas={personas}
+            album={album}
             writing={albumWriting}
-            onPlan={handlePlanAlbum}
-            onWriteLyrics={handleWriteAlbumLyrics}
-            onAlbumChange={handleAlbumChange}
-            onPatchSong={patchAlbumSong}
-            onGenerateMusic={handleGenerateMusic}
+            onPlan={actions.planAlbum}
+            onWriteLyrics={(provider, sunoModel, useLibrary, excludedIds) =>
+              // błąd pojedynczej piosenki zapisuje się w jej statusie; całość nie przerywa UI
+              actions
+                .writeAlbumLyrics({ provider, sunoModel, useLibrary, excludedIds })
+                .catch(() => {})
+            }
+            onAlbumChange={(next) => void actions.setAlbum(next)}
+            onPatchSong={(index, patch) => void actions.patchAlbumSong(index, patch)}
+            onGenerateMusic={generateMusic}
           />
         </div>
         <div className={view === "files" ? "" : "hidden"}>
           <FilesView
-            library={library!}
-            onAdd={handleLibraryAdd}
-            onToggleKind={handleToggleKind}
-            onRemove={(id) => void removeLibraryM({ domainId: id })}
+            library={library}
+            onAdd={(docs) => void actions.addLibraryDocs(docs)}
+            onToggleKind={(id) => {
+              const doc = library.find((d) => d.id === id);
+              if (doc) void actions.setDocKind(id, doc.kind === "guide" ? "content" : "guide");
+            }}
+            onRemove={(id) => void actions.removeLibraryDoc(id)}
           />
         </div>
         <div className={view === "player" ? "" : "hidden"}>
@@ -286,7 +189,7 @@ export default function Studio() {
         </div>
         <div className={view === "library" ? "" : "hidden"}>
           <LibraryView
-            tracks={tracks!}
+            tracks={tracks}
             playback={playback}
             onPlay={(p) => {
               setPlayback(p);
@@ -300,34 +203,34 @@ export default function Studio() {
               )
             }
             onStopPlayback={() => setPlayback(null)}
-            onDelete={(id) => void removeTrackM({ domainId: id })}
+            onDelete={(id) => void actions.removeTrack(id)}
             onRetry={async (id) => {
-              await retryGenA({ domainId: id });
+              await actions.retryGeneration(id);
               void refreshBalances(); // ponowna generacja zjada kredyty Suno
             }}
             onRegenerate={async (id) => {
-              await regenerateA({ domainId: id });
+              await actions.regenerateExpired(id);
               void refreshBalances(); // przegenerowanie zjada kredyty Suno
             }}
-            onCreatePersona={handleCreatePersona}
-            onConvertToWav={(domainId, audioId) => convertWavA({ domainId, audioId })}
-            onGenerateCover={async (id) => {
-              await genCoverA({ domainId: id });
-            }}
-            onGenerateAlbumCovers={(name) => genAlbumCoversM({ album: name })}
-            onResetCovers={(ids) => resetCoversM({ domainIds: ids })}
-            onSetCoverSource={async (ids, source) => {
-              for (const id of ids) {
-                await patchTrackM({ domainId: id, patch: { coverSource: source } });
-              }
-            }}
+            onCreatePersona={(track, audioId, name, description) =>
+              actions.createPersona(track.id, audioId, name, description)
+            }
+            onConvertToWav={actions.convertToWav}
+            onGenerateCover={actions.generateCover}
+            onGenerateAlbumCovers={actions.generateAlbumCovers}
+            onResetCovers={actions.resetCovers}
+            onSetCoverSource={actions.setCoverSource}
           />
         </div>
         <div className={view === "settings" ? "" : "hidden"}>
           <SettingsView
             settings={settings}
-            onSave={handleSaveSettings}
-            onCheckCredits={(sunoKey) => getCreditsA({ sunoKey })}
+            onSave={async (next) => {
+              await actions.saveSettings(next);
+              void refreshBalances(); // klucze mogły się zmienić
+            }}
+            onCheckCredits={actions.getCredits}
+            extras={settingsExtras}
           />
         </div>
       </main>

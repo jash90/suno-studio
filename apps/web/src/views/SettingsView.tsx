@@ -1,11 +1,7 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { ANTHROPIC_MODELS, OPENAI_MODELS, Provider, Settings, SunoModel } from "@suno/core";
 import { ALBUM_PROMPT_TEMPLATE, SONG_PROMPT_TEMPLATE } from "@suno/core";
-import platform from "@platform";
-import AccountPanel from "../components/AccountPanel";
-import DesktopSettings from "../components/DesktopSettings";
-import LegacyImport from "../components/LegacyImport";
 
 /** Select z listą modeli; zachowuje bieżącą wartość spoza listy jako dodatkową opcję. */
 function ModelSelect({
@@ -31,6 +27,8 @@ function ModelSelect({
 
 interface Props {
   settings: Settings;
+  /** Sekcje zależne od wersji: konto (web) / dane lokalne i folder zapisu (desktop) */
+  extras?: ReactNode;
   onSave: (settings: Settings) => Promise<void>;
   onCheckCredits: (sunoKey: string) => Promise<number>;
 }
@@ -110,7 +108,7 @@ function KeyInput({
   );
 }
 
-export default function SettingsView({ settings, onSave, onCheckCredits }: Props) {
+export default function SettingsView({ settings, onSave, onCheckCredits, extras }: Props) {
   const [form, setForm] = useState<Settings>(settings);
   const [saved, setSaved] = useState(false);
   const [credits, setCredits] = useState<string | null>(null);
@@ -262,14 +260,7 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
       )}
       {credits && <p className="info">{credits}</p>}
 
-      {platform.desktop && (
-        <>
-          <DesktopSettings desktop={platform.desktop} />
-          <LegacyImport desktop={platform.desktop} />
-        </>
-      )}
-
-      <AccountPanel />
+      {extras}
     </div>
   );
 }

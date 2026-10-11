@@ -5,7 +5,8 @@
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "paths": {
-      "@platform": ["./src/platform/web.ts"]
+      "@platform": ["./src/platform/web.ts"],
+      "@entry": ["./src/entry/web.tsx"]
     }
   },
   "include": ["src"],

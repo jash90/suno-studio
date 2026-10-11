@@ -1,26 +1,10 @@
 import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import { readFileSync } from "node:fs";
-
-/** Zmienne z .env.tauri — build desktopu zawsze celuje w produkcyjny Convex. Czytamy
- *  plik wprost, bo Nx wstrzykuje .env.local do process.env, a to wygrywa z plikami
- *  trybu Vite (desktop zbudowany lokalnie łączyłby się z deploymentem dev). */
-function desktopBuildDefines(): Record<string, string> {
-  const file = readFileSync(new URL("../../.env.tauri", import.meta.url), "utf8");
-  return Object.fromEntries(
-    file
-      .split("\n")
-      .map((line) => line.match(/^(VITE_[A-Z_]+)=(.*)$/))
-      .filter((m): m is RegExpMatchArray => m !== null)
-      .map(([, key, value]) => [`import.meta.env.${key}`, JSON.stringify(value.trim())])
-  );
-}
-
 // Jeden frontend, dwa cele:
 //  - web (domyślny tryb): PWA na Vercelu, dist/
 //  - desktop (`--mode tauri`, dev: `tauri-dev`): bundle ładowany przez powłokę Tauri
-//    z apps/desktop, bez service workera (SW w webview tylko przeszkadza), dist-tauri/
+//    z apps/desktop, dane lokalne zamiast Convex, bez service workera, dist-tauri/
 export default defineConfig(({ mode }) => {
   const desktop = mode.startsWith("tauri");
 
@@ -57,7 +41,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), desktop ? null : pwa],
-    define: mode === "tauri" ? desktopBuildDefines() : {},
     // .env.local leży w korzeniu repo (tam działa też `convex dev`)
     envDir: "../..",
     resolve: {
@@ -66,6 +49,11 @@ export default defineConfig(({ mode }) => {
         // kod Tauri nie trafia do bundla web i odwrotnie.
         "@platform": new URL(
           desktop ? "./src/platform/tauri.ts" : "./src/platform/web.ts",
+          import.meta.url
+        ).pathname,
+        // web: konto + Convex; desktop: dane lokalne (Convex nie trafia do bundla)
+        "@entry": new URL(
+          desktop ? "./src/entry/desktop.tsx" : "./src/entry/web.tsx",
           import.meta.url
         ).pathname,
       },

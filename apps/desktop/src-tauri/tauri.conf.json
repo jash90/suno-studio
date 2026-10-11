@@ -22,13 +22,17 @@
     "security": {
       "csp": {
         "default-src": "'self'",
-        "connect-src": "'self' ipc: http://ipc.localhost https: wss: http://127.0.0.1:3210 http://127.0.0.1:3211 ws://127.0.0.1:3210",
-        "img-src": "'self' data: blob: https:",
-        "media-src": "'self' blob: https:",
+        "connect-src": "'self' ipc: http://ipc.localhost asset: http://asset.localhost",
+        "img-src": "'self' data: blob: https: asset: http://asset.localhost",
+        "media-src": "'self' blob: https: asset: http://asset.localhost",
         "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src": "'self' https://fonts.gstatic.com",
         "worker-src": "'self' blob:",
         "script-src": "'self'"
+      },
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/audio/**", "$APPDATA/covers/**"]
       }
     }
   },

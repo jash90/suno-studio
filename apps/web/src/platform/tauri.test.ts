@@ -21,7 +21,17 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   }),
   exists: vi.fn(async (path: string) => files.has(path)),
   mkdir: vi.fn(async (path: string) => void dirs.add(path)),
+  remove: vi.fn(async (path: string) => void files.delete(path)),
+  stat: vi.fn(async (path: string) => ({ size: files.get(path)?.length ?? 0 })),
 }));
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => `asset://localhost/${encodeURIComponent(path)}`,
+}));
+vi.mock("@tauri-apps/api/path", () => ({
+  appDataDir: async () => "/data",
+  join: async (...parts: string[]) => parts.join("/"),
+}));
+vi.mock("@tauri-apps/plugin-opener", () => ({ revealItemInDir: vi.fn() }));
 vi.mock("@tauri-apps/plugin-http", () => ({
   fetch: vi.fn(async (url: string) =>
     url.includes("404")
@@ -46,12 +56,15 @@ vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: vi.fn() }));
 
 const { default: platform } = await import("./tauri");
 const text = (path: string) => new TextDecoder().decode(files.get(path));
+/** tauri.ts trzyma uchwyty store'ów — zmieniamy zawartość istniejących map */
+function seed(file: string, key: string, value: unknown) {
+  if (!stores.has(file)) stores.set(file, new Map());
+  stores.get(file)!.set(key, value);
+}
 
 beforeEach(() => {
   files.clear();
   dirs.clear();
-  // tauri.ts trzyma uchwyt device.json między wywołaniami — czyścimy zawartość,
-  // nie podmieniamy map
   for (const data of stores.values()) data.clear();
   vi.clearAllMocks();
 });
@@ -73,8 +86,7 @@ describe("tauri platform — saving", () => {
   });
 
   it("takes the default folder from legacy desktop settings on first run", async () => {
-    stores.set("settings.json", new Map([["settings", { defaultSaveDir: "/legacy" }]]));
-    stores.get("device.json")?.clear();
+    seed("settings.json", "settings", { defaultSaveDir: "/legacy" });
     expect(await platform.desktop!.getDefaultSaveDir()).toBe("/legacy");
     await platform.desktop!.setDefaultSaveDir("");
     expect(await platform.desktop!.getDefaultSaveDir()).toBe(""); // świadome „pytaj zawsze”
@@ -111,33 +123,31 @@ describe("tauri platform — saving", () => {
   });
 });
 
-describe("tauri platform — legacy data", () => {
-  it("reads the old stores and AI cover files once", async () => {
-    const coverPath = "/Users/me/Library/Application Support/app/covers/a.png";
-    files.set(coverPath, new Uint8Array([1, 2, 3]));
-    const seed = (name: string, key: string, value: unknown) => {
-      if (!stores.has(name)) stores.set(name, new Map());
-      stores.get(name)!.set(key, value);
-    };
-    seed("history.json", "tracks", [
-      { id: "t1", aiImagePath: coverPath },
-      { id: "t2", aiImagePath: "/gone.png" },
-    ]);
-    seed("library.json", "docs", [{ id: "d1" }]);
-    seed("album.json", "album", { title: "X" });
+describe("tauri platform — local data I/O (silnik desktopu)", () => {
+  const desktop = platform.desktop!;
 
-    const data = await platform.desktop!.readLegacyData();
-    expect(data?.tracks).toHaveLength(2);
-    expect(data?.library).toHaveLength(1);
-    expect(data?.album).toEqual({ title: "X" });
-    expect([...data!.covers.keys()]).toEqual([coverPath]); // brakujący plik pominięty
-    expect(data!.covers.get(coverPath)!.size).toBe(3);
-
-    await platform.desktop!.markLegacyImported();
-    expect(await platform.desktop!.readLegacyData()).toBeNull();
+  it("reads and writes the same store files as the old desktop app", async () => {
+    seed("history.json", "tracks", [{ id: "t1" }]);
+    expect(await desktop.readStore("history.json", "tracks")).toEqual([{ id: "t1" }]);
+    await desktop.writeStore("history.json", "tracks", []);
+    expect(stores.get("history.json")!.get("tracks")).toEqual([]);
   });
 
-  it("returns null when there is nothing to import", async () => {
-    expect(await platform.desktop!.readLegacyData()).toBeNull();
+  it("writes data files under the app data dir and serves them back via asset URLs", async () => {
+    const path = await desktop.writeDataFile("audio/t1-a.mp3", new Blob(["mp3"]));
+    expect(path).toBe("/data/audio/t1-a.mp3");
+    expect(dirs.has("/data/audio")).toBe(true);
+    expect(await desktop.fileSize(path)).toBe(3);
+
+    // zapis „Pobierz MP3” z archiwum na dysku czyta plik, nie idzie przez HTTP
+    const url = desktop.fileUrl(path);
+    const saved = await platform.saveFile({ url }, "kopia.mp3");
+    expect(saved).toBeNull(); // brak folderu domyślnego i dialog anulowany
+    dialog.save.mockResolvedValueOnce("/Users/me/kopia.mp3");
+    await platform.saveFile({ url }, "kopia.mp3");
+    expect(text("/Users/me/kopia.mp3")).toBe("mp3");
+
+    await desktop.removeFile(path);
+    expect(files.has(path)).toBe(false);
   });
 });
