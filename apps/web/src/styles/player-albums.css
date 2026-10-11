@@ -1,0 +1,245 @@
+/* ------------------------------------------------------------
+   Odtwarzacz i grupy albumów
+   ------------------------------------------------------------ */
+
+.player {
+  width: 100%;
+}
+
+audio {
+  color-scheme: dark;
+}
+
+.album-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.album-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Zawijanie MIĘDZY elementami — bez tego flex ściskał je poniżej szerokości
+     treści i napisy łamały się w środku („Odtwórz / album"). */
+  flex-wrap: wrap;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+}
+
+.album-group-header strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.album-group-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.album-toggle {
+  background: transparent;
+  border: none;
+  padding: 0.1rem 0.2rem;
+  gap: 0.5rem;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+/* Akcje albumu dostają własny wiersz pod tytułem — jest ich kilkanaście
+   i nigdy nie zmieszczą się obok nazwy. Odstęp między grupami wyraźnie
+   większy niż wewnątrz grupy — to on je rozdziela. */
+.album-group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-basis: 100%;
+  gap: 0.5rem 1.15rem;
+}
+
+.album-group-actions button {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  white-space: nowrap;
+}
+
+/* Klaster powiązanych akcji z etykietą — kilkanaście pigułek czyta się
+   jako kilka grup (Warianty / Pobierz / Okładki AI). */
+.action-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.action-group-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.album-player {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: linear-gradient(180deg, rgba(240, 160, 60, 0.07), transparent 70%), var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.95rem;
+  position: sticky;
+  bottom: 0.8rem;
+  z-index: 5;
+  box-shadow: 0 14px 34px -16px rgba(0, 0, 0, 0.8);
+}
+
+.album-player-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.album-player-bar audio {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Wersja w zakładce Odtwarzacz — statyczny panel, pełna kolejka */
+.album-player.standalone {
+  position: static;
+  box-shadow: none;
+}
+
+/* Fala dźwięku (wavesurfer) */
+.wave-canvas {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.wave-time {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.album-queue.open {
+  max-height: 60vh;
+}
+
+/* Rozwijana kolejka odtwarzania */
+.album-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0 0;
+  max-height: 190px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-soft);
+}
+
+.album-queue button {
+  width: 100%;
+  justify-content: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0.25rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: left;
+}
+
+.album-queue button.active,
+.album-queue button:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.album-queue li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.album-queue li > button:first-child {
+  flex: 1;
+}
+
+.queue-item-actions {
+  display: inline-flex;
+  gap: 0.1rem;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.album-queue li:hover .queue-item-actions,
+.album-queue li:focus-within .queue-item-actions {
+  opacity: 1;
+}
+
+.queue-item-actions .btn-icon {
+  padding: 0.15rem 0.3rem;
+}
+
+.btn-icon.accent {
+  color: var(--accent);
+}
+
+.album-player-now {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--accent);
+}
+
+.album-player audio {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Wybór trybu (wariant utworu, źródło okładki, A/B/A+B) — zrośnięta kontrolka
+   segmentowa, żeby nie wyglądała jak rząd zwykłych akcji obok. Szerokość treści:
+   w kolumnowym flexie karty utworu `align-items: stretch` rozciągał ją na całość. */
+.variant-switch {
+  display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.variant-switch button {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.25rem 0.7rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  white-space: nowrap;
+}
+
+.variant-switch button + button {
+  border-left: 1px solid var(--border);
+}
+
+.variant-switch button:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+
+.variant-switch button.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}

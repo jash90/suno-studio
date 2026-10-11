@@ -1,0 +1,68 @@
+/* ------------------------------------------------------------
+   Biblioteka utworów — karty
+   ------------------------------------------------------------ */
+
+.track-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.track {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 45%), var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: border-color 0.15s;
+}
+
+.track:hover {
+  border-color: var(--border);
+}
+
+.track.playing {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 10px 30px -18px rgba(240, 160, 60, 0.5);
+}
+
+.track-header {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.track-cover {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--border-soft);
+}
+
+.track-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.track-meta strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.005em;
+}
+
+.track-sub {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}

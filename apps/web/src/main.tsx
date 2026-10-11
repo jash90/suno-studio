@@ -5,7 +5,7 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { BrowserRouter, HashRouter } from "react-router-dom";
 import platform from "@platform";
 import App from "./App";
-import "./App.css";
+import "./styles/index.css";
 
 platform.init();
 

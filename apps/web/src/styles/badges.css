@@ -1,0 +1,58 @@
+/* ------------------------------------------------------------
+   Plakietki statusów
+   ------------------------------------------------------------ */
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+button.badge {
+  cursor: pointer;
+  background: transparent;
+}
+
+.badge-success,
+.badge-kind-content {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+
+.badge-failed {
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 55%, transparent);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+}
+
+.badge-pending,
+.badge-text_success,
+.badge-first_success {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+.badge-kind-guide {
+  color: var(--guide);
+  border-color: color-mix(in srgb, var(--guide) 55%, transparent);
+  background: color-mix(in srgb, var(--guide) 8%, transparent);
+}
+
+.kind-content {
+  color: var(--ok);
+  flex-shrink: 0;
+}
+
+.kind-guide {
+  color: var(--guide);
+  flex-shrink: 0;
+}

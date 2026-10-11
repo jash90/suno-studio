@@ -1,0 +1,38 @@
+/* ------------------------------------------------------------
+   Wybór dokumentów
+   ------------------------------------------------------------ */
+
+.doc-picker {
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.95rem;
+}
+
+.doc-picker-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  margin-bottom: 0.45rem;
+}
+
+.doc-picker-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.15rem 1rem;
+}
+
+.doc-picker-list .checkbox {
+  padding: 0.1rem 0;
+}

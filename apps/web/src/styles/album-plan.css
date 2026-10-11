@@ -1,0 +1,95 @@
+/* ------------------------------------------------------------
+   Album — plan i piosenki
+   ------------------------------------------------------------ */
+
+.album-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.album-header h2,
+.album-header strong {
+  font-family: var(--font-display);
+}
+
+.album-songs {
+  list-style: none;
+  counter-reset: song;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.album-song {
+  counter-increment: song;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 45%), var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: border-color 0.15s;
+}
+
+.album-song:hover {
+  border-color: var(--border);
+}
+
+.album-song-header {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.album-song-header strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.album-song-header strong::before {
+  content: counter(song, decimal-leading-zero) " ";
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.8em;
+  color: var(--accent);
+}
+
+.album-song-header .badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.badge-song-planned {
+  color: var(--muted);
+}
+
+.badge-song-writing {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+.badge-song-written {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+
+.badge-song-error {
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 55%, transparent);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+}
+
+.badge-song-sent {
+  color: var(--guide);
+  border-color: color-mix(in srgb, var(--guide) 55%, transparent);
+  background: color-mix(in srgb, var(--guide) 8%, transparent);
+}
