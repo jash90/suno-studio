@@ -1,0 +1,172 @@
+/* ------------------------------------------------------------
+   Górna belka — szyna konsolety
+   ------------------------------------------------------------ */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 1.3rem;
+  background: linear-gradient(180deg, #1f1a1b, #171314);
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.12rem;
+  letter-spacing: -0.01em;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.topbar h1 svg {
+  color: var(--accent);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.balance-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  overflow: hidden;
+}
+
+.balance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.balance-bar:hover .balance-chip {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.balance-refresh {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.topbar nav {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar nav::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar nav button {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.topbar nav button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: transparent;
+  background: var(--panel-2);
+}
+
+.topbar nav button.active {
+  background: var(--accent-dim);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+/* Wskaźnik aktywnej zakładki — kreska jak podziałka na skali */
+.topbar nav button.active::after {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+main {
+  flex: 1;
+  width: 100%;
+}
+
+.view {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 1.6rem 1.3rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Nagłówki sekcji — etykiety jak na panelu sprzętu */
+h2 {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin: 0.9rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+h2::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}

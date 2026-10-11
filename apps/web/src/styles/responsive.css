@@ -1,0 +1,223 @@
+/* ------------------------------------------------------------
+   Responsywność
+   ------------------------------------------------------------ */
+
+/* Dolny pasek zakładek — istnieje tylko na mobile */
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  :root {
+    font-size: 14px;
+    --bottom-nav-h: 56px;
+  }
+
+  /* Pasek: jeden wiersz — logo + wyloguj; zakładki przenoszą się na dół.
+     Safe-area dla notcha w trybie PWA (standalone). */
+  .topbar {
+    padding: 0.5rem 0.9rem;
+    padding-top: calc(0.5rem + env(safe-area-inset-top));
+    flex-wrap: nowrap;
+  }
+
+  .topbar-left {
+    gap: 0.7rem;
+  }
+
+  .balance-bar {
+    display: none;
+  }
+
+  /* Zakładki górne ukryte — nawigacja idzie dolnym paskiem; zostaje wyloguj */
+  .topbar nav button:not(.btn-icon) {
+    display: none;
+  }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: linear-gradient(180deg, #1f1a1b, #171314);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-nav button {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    min-height: var(--bottom-nav-h);
+    padding: 0.35rem 0.1rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bottom-nav button.active {
+    color: var(--accent);
+  }
+
+  .bottom-nav-icon {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .bottom-nav-badge {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.6rem;
+    background: var(--accent);
+    color: #171314;
+    border-radius: 999px;
+    padding: 0.1rem 0.28rem;
+    font-size: 0.58rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .bottom-nav-dot {
+    position: absolute;
+    top: -0.15rem;
+    right: -0.3rem;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* Treść nie może chować się pod dolnym paskiem */
+  .view {
+    padding: 1.1rem 0.9rem calc(1.6rem + var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  }
+
+  .controls-row {
+    gap: 0.7rem;
+  }
+
+  .controls-row label {
+    min-width: 100%;
+  }
+
+  .controls-row label.checkbox {
+    padding-bottom: 0;
+  }
+
+  /* iOS: pola < 16px powodują auto-zoom przy fokusie — wymuszamy 16px */
+  input,
+  textarea,
+  select,
+  label input,
+  label textarea,
+  label select {
+    font-size: 16px;
+  }
+
+  /* Wygodniejsze checkboxy pod palec */
+  .checkbox input {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Główne przyciski akcji łatwe do trafienia */
+  button {
+    min-height: 42px;
+  }
+
+  .btn-icon,
+  .btn-link,
+  .album-toggle,
+  button.badge {
+    min-height: 0;
+  }
+
+  .track {
+    padding: 0.75rem 0.8rem;
+  }
+
+  .track-cover {
+    width: 44px;
+    height: 44px;
+  }
+
+  .album-song {
+    padding: 0.65rem 0.8rem;
+  }
+
+  /* Sticky player siedzi NAD dolnym paskiem zakładek */
+  .album-player {
+    flex-wrap: wrap;
+    bottom: calc(0.6rem + var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  }
+
+  /* Kolejka: tytuł przycina się zamiast łamać wiersz, akcje zawsze widoczne
+     (na dotyku nie ma hovera) */
+  .album-queue li > button:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .queue-item-actions {
+    opacity: 1;
+  }
+
+  /* Akcje utworu: równa siatka 2×N zamiast poszarpanych rzędów */
+  .track-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+  }
+
+  .track-actions button {
+    padding: 0.3rem 0.4rem;
+  }
+
+  /* Nagłówek grupy albumu zawija się zamiast wystawać poza ekran */
+  .album-group-header {
+    flex-wrap: wrap;
+    row-gap: 0.45rem;
+  }
+
+  .album-group-actions {
+    row-gap: 0.6rem;
+  }
+
+  /* Na dotyku segmenty przełączników muszą mieć pełną wysokość przycisku */
+  .variant-switch button {
+    min-height: 36px;
+  }
+
+  /* Ramka focusa po tapnięciu zakładki — wewnątrz przycisku, nie ponad paskiem */
+  .bottom-nav button:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .album-player-now {
+    width: 100%;
+  }
+
+  .doc-picker-list {
+    grid-template-columns: 1fr;
+  }
+
+  .signin {
+    padding: 1.8rem 1.4rem 1.5rem;
+  }
+}

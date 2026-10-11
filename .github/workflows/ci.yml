@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, lint, testy, build web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: nrwl/nx-set-shas@v4
+      - name: Typecheck + lint + testy (projekty dotknięte zmianą)
+        run: npx nx affected -t typecheck lint test --exclude desktop
+      - name: Format
+        run: npm run format:check
+      - name: Build web
+        run: npx nx build web
+        env:
+          VITE_CONVEX_URL: https://example.convex.cloud
+
+  e2e:
+    name: E2E (Playwright + lokalny Convex)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Lokalny backend Convex (deployment, klucze auth, .env.local)
+        run: npm run setup:local
+      - run: npm run e2e
+        env:
+          CI: "1"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web-e2e/playwright-report
+          retention-days: 7
+
+  desktop:
+    name: Desktop (cargo check + bundle frontendu)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: npm ci
+      - run: npx nx typecheck desktop
+      - run: npx nx run web:build:tauri

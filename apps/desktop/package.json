@@ -1,0 +1,42 @@
+{
+  "name": "@suno/desktop",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Powłoka Tauri 2 dla Suno Studio — frontend to apps/web zbudowany w trybie `tauri`.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri",
+    "typecheck": "cargo check --manifest-path src-tauri/Cargo.toml"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "nx": {
+    "name": "desktop",
+    "tags": [
+      "scope:frontend",
+      "type:app"
+    ],
+    "implicitDependencies": [
+      "web"
+    ],
+    "targets": {
+      "build": {
+        "dependsOn": [],
+        "outputs": [
+          "{projectRoot}/src-tauri/target/release/bundle"
+        ]
+      },
+      "typecheck": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/src-tauri/**/*",
+          "!{projectRoot}/src-tauri/target/**/*"
+        ]
+      }
+    },
+    "projectType": "application"
+  }
+}

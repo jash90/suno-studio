@@ -1,0 +1,56 @@
+/* ------------------------------------------------------------
+   Pasek postępu — miernik taśmy
+   ------------------------------------------------------------ */
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.progress {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-deep);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover), var(--accent));
+  background-size: 200% 100%;
+  animation: progress-shimmer 1.6s linear infinite;
+  transition: width 0.6s ease;
+}
+
+@keyframes progress-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+.progress-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.spin {
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

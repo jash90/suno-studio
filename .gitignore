@@ -1,7 +1,14 @@
 node_modules
 dist
 dist-ssr
+dist-tauri
 *.local
 .env.local
 .DS_Store
 .vercel
+.nx/cache
+.nx/workspace-data
+coverage
+test-results
+playwright-report
+.playwright-mcp

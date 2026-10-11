@@ -1,0 +1,61 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Suno Studio",
+  "version": "0.2.0",
+  "identifier": "com.bartlomiejzimny.suno-studio",
+  "build": {
+    "beforeDevCommand": "npx nx run web:dev:tauri",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npx nx run web:build:tauri",
+    "frontendDist": "../../web/dist-tauri"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Suno Studio",
+        "width": 1100,
+        "height": 780,
+        "minWidth": 760,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost asset: http://asset.localhost",
+        "img-src": "'self' data: blob: https: asset: http://asset.localhost",
+        "media-src": "'self' blob: https: asset: http://asset.localhost",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src": "'self' https://fonts.gstatic.com",
+        "worker-src": "'self' blob:",
+        "script-src": "'self'"
+      },
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/audio/**", "$APPDATA/covers/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Music",
+    "shortDescription": "Studio piosenek AI: teksty, generacja muzyki, albumy.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYyNUU3MEY1MkQxMzQxNjMKUldSalFSTXQ5WEJlWWxZdVg0bU42b3h2bWhEQXkxdEl5bzY1WFFHaGladmJTOFk0aHVMTUYzak4K",
+      "endpoints": [
+        "https://github.com/jash90/suno-studio-web/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

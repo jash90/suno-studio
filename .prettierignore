@@ -1,0 +1,13 @@
+dist
+dist-tauri
+node_modules
+**/_generated
+**/src-tauri/target
+**/src-tauri/gen
+package-lock.json
+.nx
+.playwright-mcp
+*.md
+.convex
+playwright-report
+test-results

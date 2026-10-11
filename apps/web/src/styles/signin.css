@@ -1,0 +1,74 @@
+/* ------------------------------------------------------------
+   Logowanie — wizytówka aplikacji
+   ------------------------------------------------------------ */
+
+.signin {
+  /* resetuje mono/uppercase odziedziczone z .app-loading */
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 0.95rem;
+  text-transform: none;
+  letter-spacing: normal;
+  position: relative;
+  width: min(380px, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel) 55%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2.2rem 2rem 1.8rem;
+  box-shadow:
+    0 30px 60px -20px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  animation:
+    signin-rise 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both,
+    signin-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes signin-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+
+/* Cała ramka pulsuje bursztynem jak dioda zasilania */
+@keyframes signin-pulse {
+  0%,
+  100% {
+    border-color: var(--border);
+    box-shadow:
+      0 30px 60px -20px rgba(0, 0, 0, 0.7),
+      0 0 0 1px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    border-color: var(--accent);
+    box-shadow:
+      0 30px 60px -20px rgba(0, 0, 0, 0.7),
+      0 0 0 1px rgba(0, 0, 0, 0.4),
+      0 0 26px -6px rgba(240, 160, 60, 0.45);
+  }
+}
+
+.signin h1 {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.7rem;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.signin h1 svg {
+  color: var(--accent);
+}
+
+.signin .hint {
+  margin-bottom: 0.5rem;
+}
+
+.signin input {
+  background: var(--bg-deep);
+}

@@ -1,0 +1,103 @@
+/* ------------------------------------------------------------
+   Formularze
+   ------------------------------------------------------------ */
+
+input,
+textarea,
+select {
+  font: inherit;
+  width: 100%;
+  color: var(--text);
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6f6560;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+label input,
+label textarea,
+label select {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 0.95rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.counter {
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.counter.over {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.controls-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.controls-row label {
+  flex: 1;
+  min-width: 160px;
+}
+
+.controls-row label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: auto;
+  padding-bottom: 0.55rem;
+}
+
+.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 0.88rem;
+}
+
+.checkbox input {
+  width: auto;
+  accent-color: var(--accent);
+}

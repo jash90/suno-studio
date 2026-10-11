@@ -1,0 +1,17 @@
+/* Style aplikacji — kolejność importów = kolejność kaskady (responsive na końcu). */
+@import "./base.css";
+@import "./signin.css";
+@import "./topbar.css";
+@import "./buttons.css";
+@import "./forms.css";
+@import "./file-drop.css";
+@import "./editor.css";
+@import "./track-card.css";
+@import "./badges.css";
+@import "./doc-picker.css";
+@import "./player-albums.css";
+@import "./progress.css";
+@import "./track-actions.css";
+@import "./settings.css";
+@import "./album-plan.css";
+@import "./responsive.css";
