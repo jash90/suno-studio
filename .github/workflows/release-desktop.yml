@@ -7,7 +7,6 @@ name: Release desktop
 on:
   push:
     tags: ["desktop-v*"]
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,6 +33,16 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
       - run: npm ci
+      # aktualizator porównuje wersję z tauri.conf.json — tag bez podbicia wersji
+      # dałby wydanie, którego zainstalowane aplikacje nie uznają za nowsze
+      - name: Tag zgodny z wersją aplikacji
+        run: |
+          APP=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          TAG="${GITHUB_REF_NAME#desktop-v}"
+          if [ "$APP" != "$TAG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME ≠ wersja $APP w tauri.conf.json — podbij wersję"
+            exit 1
+          fi
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

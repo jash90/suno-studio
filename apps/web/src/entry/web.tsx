@@ -3,9 +3,9 @@ import { Authenticated, AuthLoading, ConvexReactClient, Unauthenticated } from "
 import { ConvexAuthProvider, useAuthActions, useAuthToken } from "@convex-dev/auth/react";
 import { BrowserRouter } from "react-router-dom";
 import platform from "@platform";
-import SignIn from "../app/SignIn";
+import SignIn from "./web/SignIn";
 import Studio from "../app/Studio";
-import AccountPanel from "../components/AccountPanel";
+import AccountPanel from "./web/AccountPanel";
 import { useConvexStudio } from "../data/convex";
 
 // Wersja web: konto (Convex Auth), dane w Convex, PWA.

@@ -2,33 +2,48 @@
 
 Studio piosenek AI: teksty (OpenAI/Anthropic + biblioteka materiałów z BM25), generacja
 muzyki w Suno (sunoapi.org), koncept-albumy, okładki AI, odtwarzacz z kolejką.
-**Jedna baza kodu, dwie aplikacje:** web (PWA na Vercelu) i desktop (Tauri, macOS) — obie
-na wspólnym backendzie Convex i wspólnym kodzie UI.
+**Jedna baza kodu, dwie aplikacje:**
+
+- **web** (PWA na Vercelu) — konto, dane w Convex, logika w akcjach backendu,
+- **desktop** (Tauri, macOS) — bez konta i chmury: dane, klucze API i archiwum nagrań
+  leżą na komputerze, logika działa w procesie aplikacji.
+
+Obie wersje mają ten sam interfejs (`apps/web`) i tę samą logikę domenową/integracje
+(`@suno/core`); różni je tylko źródło danych (`StudioBackend`) i warstwa platformy.
 
 ## Struktura (monorepo Nx + npm workspaces)
 
 ```
 apps/
   web/          @suno/web      React + Vite — jedyny frontend (PWA i bundle desktopu)
-    src/platform/              warstwa platformy: web.ts (ZIP, PWA) | tauri.ts (zapis na dysk)
+    src/app/                   Studio (UI) — zna tylko kontrakt StudioBackend
+    src/data/                  convex.ts (web) | local/LocalStudio.ts (silnik desktopu)
+    src/entry/                 web.tsx (Convex + konto) | desktop.tsx (dane lokalne)
+    src/platform/              web.ts (ZIP, PWA) | tauri.ts (pliki, store, plugin-http)
   desktop/      @suno/desktop  cienka powłoka Tauri 2 (src-tauri/), ładuje apps/web
   web-e2e/      @suno/web-e2e  testy Playwright na lokalnym backendzie Convex
 packages/
-  core/         @suno/core     czysta logika: typy, prompty, BM25, parsowanie LLM, walidacja
+  core/         @suno/core     logika domenowa i integracje (Suno, OpenAI/Anthropic, okładki,
+                               salda) z wstrzykiwanym fetch — wspólne dla Convex i desktopu
   backend/      @suno/backend  Convex: schema, mutacje/akcje, scheduler, auth, testy convex-test
 scripts/                       setup lokalnego backendu, build Vercela
 ```
 
 Granice warstw pilnuje ESLint (`@nx/enforce-module-boundaries` + `no-restricted-imports`):
 `core` nie zna Reacta/Convexa/Tauri; API Tauri wolno używać tylko w `platform/tauri.ts`;
-widoki (`views/`) dostają dane przez propsy — Convex podpinany jest w `app/`.
+Convex tylko w `entry/web*` i `data/convex.ts` (wszystko inne trafia też do desktopu bez
+chmury); widoki dostają dane przez propsy.
 
-Implementację platformy wybiera build (alias `@platform` w `apps/web/vite.config.ts`):
+Wariant wybiera build (aliasy `@platform` i `@entry` w `apps/web/vite.config.ts`) —
+Convex nie trafia do bundla desktopu, Tauri do bundla web:
 
 | | web | desktop |
 |---|---|---|
-| pobieranie plików | CDN bezpośrednio, fallback proxy `/download` | plugin-http (bez CORS) |
-| zapis | download przeglądarki, album → ZIP | dysk: domyślny folder albo dialog, album → podfolder |
+| dane | Convex (konto, logowanie) | pliki w katalogu danych aplikacji (te same co dawny desktop) |
+| logika (generacja, polling, album, okładki) | akcje Convex + scheduler | `LocalStudio` w procesie aplikacji |
+| archiwum nagrań/okładek | Convex storage | `audio/`, `covers/` na dysku (protokół asset) |
+| wywołania API | z serwera Convex | plugin-http (bez CORS), klucze lokalnie |
+| zapis plików | download przeglądarki, album → ZIP | dysk: domyślny folder albo dialog, album → podfolder |
 | aktualizacje | service worker PWA | tauri-plugin-updater (GitHub Releases) |
 | routing | `BrowserRouter` | `HashRouter` |
 
@@ -75,13 +90,16 @@ npm run dev:desktop          # tauri dev: Vite w trybie tauri-dev (port 1420) + 
 npm run build:desktop        # .app/.dmg w apps/desktop/src-tauri/target/release/bundle
 ```
 
-Build desktopu zawsze łączy się z **produkcyjnym** Convex (`.env.tauri`); `tauri dev` używa
-`.env.local`. Lokalny build z artefaktami aktualizacji wymaga klucza:
+Desktop nie potrzebuje backendu ani `.env.local` — dane trzyma w
+`~/Library/Application Support/com.bartlomiejzimny.suno-studio/` (`history.json`,
+`library.json`, …, `audio/`, `covers/`). Do testów na kopii danych:
+`npx tauri dev --config '{"identifier":"com.bartlomiejzimny.suno-studio.qa"}'` (w `apps/desktop`).
+Lokalny build z artefaktami aktualizacji wymaga klucza:
 `TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/suno-studio.key)"` i
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(cat ~/.tauri/suno-studio.key.password)"`.
 
-Ustawienia desktopu specyficzne dla maszyny (domyślny folder zapisu) leżą lokalnie
-(`device.json` w danych aplikacji), nie na koncie.
+Domyślny folder zapisu: `device.json`; folder wybrany w dialogu pozostaje dostępny po
+restarcie (tauri-plugin-persisted-scope).
 
 ## Wdrożenie
 
@@ -105,7 +123,7 @@ Ustawienia desktopu specyficzne dla maszyny (domyślny folder zapisu) leżą lok
 | Convex | `AUTH_RESEND_KEY`, `AUTH_EMAIL_FROM` | reset hasła kodem z e-maila (opcjonalnie) |
 | Vercel | `VITE_CONVEX_URL`, `VITE_CONVEX_SITE_URL` | adres backendu (bez `CONVEX_DEPLOY_KEY`) |
 | Vercel | `CONVEX_DEPLOY_KEY` | auto-deploy funkcji Convex (tylko Production) |
-| Vercel / `.env.tauri` | `VITE_SENTRY_DSN` | monitoring błędów (opcjonalnie) |
+| Vercel / env buildu desktopu | `VITE_SENTRY_DSN` | monitoring błędów (opcjonalnie) |
 
 ## Backend — skrót
 
@@ -118,11 +136,11 @@ Ustawienia desktopu specyficzne dla maszyny (domyślny folder zapisu) leżą lok
 - `cover.ts` — okładki AI (OpenAI gpt-image), dla albumu osobna per utwór (scheduler), reset.
 - `limits.ts` — limity operacji płatnych (rate limiter) + dziennik zużycia.
 - `account.ts` — zajętość archiwum, eksport JSON, usunięcie konta.
-- `legacyImport.ts` — jednorazowy import danych starej aplikacji desktopowej.
 
 ## Migracja ze starej aplikacji desktopowej
 
-Dawny `jash90/suno-studio` (Tauri z lokalnymi plikami JSON) jest teraz `apps/desktop`
-(historia zachowana). Po zalogowaniu w nowej wersji desktopowej: **Ustawienia → Dane
-z poprzedniej wersji → Importuj dane lokalne** — utwory, biblioteka, persony, album,
-okładki AI i (do pustych pól) klucze API trafiają na konto. Import można powtórzyć.
+Dawny `jash90/suno-studio` jest teraz `apps/desktop` (historia zachowana). Nowa wersja ma
+ten sam identyfikator i czyta te same pliki danych — po instalacji wszystkie utwory,
+biblioteka, persony, album, okładki AI i klucze są na miejscu. Nagrania starsze niż 14 dni
+(Suno je skasowało) są oznaczane przy starcie i można je przegenerować; nowe nagrania
+aplikacja kopiuje na dysk od razu po wygenerowaniu.

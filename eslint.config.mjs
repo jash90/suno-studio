@@ -10,6 +10,25 @@ import tseslint from "typescript-eslint";
 //   scope:frontend apps/web, desktop — UI; korzysta z core i typów API backendu
 const restrict = (patterns) => ["error", { patterns }];
 
+const WEB_ONLY = [
+  "apps/web/src/entry/web.tsx",
+  "apps/web/src/entry/web/**",
+  "apps/web/src/data/convex.ts",
+];
+const CONVEX = {
+  group: ["convex", "convex/*", "@convex-dev/*", "@suno/backend", "@suno/backend/*"],
+  message:
+    "Convex tylko w entry/web* i data/convex.ts — wspólny UI działa też w desktopie bez chmury.",
+};
+const TAURI = {
+  group: ["@tauri-apps/*"],
+  message: "API Tauri tylko w platform/tauri.ts — reszta UI używa `@platform`.",
+};
+const PLATFORM_IMPL = {
+  group: ["**/platform/web", "**/platform/tauri"],
+  message: "Importuj `@platform` (implementację wybiera build), nie konkretny plik.",
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -64,31 +83,19 @@ export default tseslint.config(
     },
   },
   {
+    // Kod wspólny dla web i desktopu: bez Convex (desktop działa bez chmury), bez Tauri
+    // (tylko platform/tauri.ts) i bez konkretnej implementacji platformy
     files: ["apps/web/src/**"],
-    ignores: ["apps/web/src/platform/tauri.ts", "apps/web/src/**/*.test.ts"],
+    ignores: [...WEB_ONLY, "apps/web/src/platform/tauri.ts", "apps/web/src/**/*.test.ts"],
     rules: {
-      "no-restricted-imports": restrict([
-        {
-          group: ["@tauri-apps/*"],
-          message: "API Tauri tylko w platform/tauri.ts — reszta UI używa `@platform`.",
-        },
-        {
-          group: ["**/platform/web", "**/platform/tauri"],
-          message: "Importuj `@platform` (implementację wybiera build), nie konkretny plik.",
-        },
-      ]),
+      "no-restricted-imports": restrict([CONVEX, TAURI, PLATFORM_IMPL]),
     },
   },
   {
-    files: ["apps/web/src/views/**"],
+    // Kod tylko wersji web (konto, Convex)
+    files: WEB_ONLY,
     rules: {
-      "no-restricted-imports": restrict([
-        {
-          group: ["convex", "convex/*", "@convex-dev/*", "@suno/backend/*"],
-          message: "Widoki dostają dane przez propsy — Convex podpinamy w App/hookach.",
-        },
-        { group: ["@tauri-apps/*"], message: "API Tauri tylko w platform/tauri.ts." },
-      ]),
+      "no-restricted-imports": restrict([TAURI, PLATFORM_IMPL]),
     },
   }
 );
