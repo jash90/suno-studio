@@ -1,0 +1,28 @@
+{
+  "name": "@suno/web-e2e",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Testy end-to-end apps/web (Playwright) na lokalnym backendzie Convex.",
+  "scripts": {
+    "e2e": "playwright test",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "name": "web-e2e",
+    "projectType": "application",
+    "tags": [
+      "scope:frontend",
+      "type:e2e"
+    ],
+    "implicitDependencies": [
+      "web",
+      "backend"
+    ],
+    "targets": {
+      "e2e": {
+        "cache": false
+      }
+    }
+  }
+}
