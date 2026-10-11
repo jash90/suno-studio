@@ -10,6 +10,7 @@ import {
 import { ALBUM_PROMPT_TEMPLATE, SONG_PROMPT_TEMPLATE } from "@suno/core";
 import platform from "@platform";
 import DesktopSettings from "../components/DesktopSettings";
+import LegacyImport from "../components/LegacyImport";
 
 /** Select z listą modeli; zachowuje bieżącą wartość spoza listy jako dodatkową opcję. */
 function ModelSelect({
@@ -262,7 +263,12 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
       {saved && <p className="info"><Check size={14} /> Zapisano</p>}
       {credits && <p className="info">{credits}</p>}
 
-      {platform.desktop && <DesktopSettings desktop={platform.desktop} />}
+      {platform.desktop && (
+        <>
+          <DesktopSettings desktop={platform.desktop} />
+          <LegacyImport desktop={platform.desktop} />
+        </>
+      )}
     </div>
   );
 }

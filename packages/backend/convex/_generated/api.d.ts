@@ -15,6 +15,7 @@ import type * as balances from "../balances.js";
 import type * as cover from "../cover.js";
 import type * as generate from "../generate.js";
 import type * as http from "../http.js";
+import type * as legacyImport from "../legacyImport.js";
 import type * as lib_llm from "../lib/llm.js";
 import type * as lib_trackRows from "../lib/trackRows.js";
 import type * as library from "../library.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   cover: typeof cover;
   generate: typeof generate;
   http: typeof http;
+  legacyImport: typeof legacyImport;
   "lib/llm": typeof lib_llm;
   "lib/trackRows": typeof lib_trackRows;
   library: typeof library;
