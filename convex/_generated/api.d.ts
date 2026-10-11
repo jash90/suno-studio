@@ -9,6 +9,7 @@
  */
 
 import type * as album from "../album.js";
+import type * as archive from "../archive.js";
 import type * as auth from "../auth.js";
 import type * as balances from "../balances.js";
 import type * as cover from "../cover.js";
@@ -30,6 +31,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   album: typeof album;
+  archive: typeof archive;
   auth: typeof auth;
   balances: typeof balances;
   cover: typeof cover;

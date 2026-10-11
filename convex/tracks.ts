@@ -48,7 +48,14 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Niezalogowany");
     const row = await findRow(ctx, userId, domainId);
-    if (row) await ctx.db.delete(row._id);
+    if (!row) return;
+    // ponytail: aiImageStorageId pomijamy — okładka albumu jest współdzielona przez utwory
+    for (const variant of (row.data as Track).variants ?? []) {
+      for (const id of [variant.audioStorageId, variant.wavStorageId]) {
+        if (id) await ctx.storage.delete(id as Id<"_storage">);
+      }
+    }
+    await ctx.db.delete(row._id);
   },
 });
 
@@ -105,6 +112,68 @@ export const replaceInternal = internalMutation({
   handler: async (ctx, { userId, domainId, track }) => {
     const row = await findRow(ctx, userId, domainId);
     if (row) await ctx.db.patch(row._id, { data: track });
+  },
+});
+
+/** Ustawia `fields` i usuwa `clear` (opcjonalnie tylko klucze z `only`). */
+function merge<T extends object>(
+  obj: T,
+  fields: Record<string, unknown>,
+  clear: string[],
+  only?: string[]
+): T {
+  const next = { ...obj } as Record<string, unknown>;
+  for (const [k, val] of Object.entries(fields)) if (!only || only.includes(k)) next[k] = val;
+  for (const k of clear) if (!only || only.includes(k)) delete next[k];
+  return next as T;
+}
+
+/** Merguje pola jednego wariantu w transakcji — archiwizacja i konwersja WAV
+ *  działają równolegle, więc nadpisywanie całej tablicy variants gubiłoby zmiany.
+ *  `clear` usuwa pola (merge nie umie ich wyczyścić). Wariant 0 jest lustrzany
+ *  w płaskich polach utworu, więc audioUrl/streamAudioUrl/wavUrl synchronizujemy. */
+export const patchVariantInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    domainId: v.string(),
+    audioId: v.string(),
+    fields: v.any(),
+    clear: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { userId, domainId, audioId, fields, clear = [] }) => {
+    const row = await findRow(ctx, userId, domainId);
+    if (!row) return;
+    const track = row.data as Track;
+    const variants = (track.variants ?? []).map((variant) =>
+      variant.audioId === audioId ? merge(variant, fields, clear) : variant
+    );
+    let next: Track = { ...track, variants };
+    if (track.audioId === audioId) {
+      next = merge(next, fields, clear, ["audioUrl", "streamAudioUrl", "wavUrl"]);
+    }
+    await ctx.db.patch(row._id, { data: next });
+  },
+});
+
+/** Utwory z wariantami, których pliki nie są jeszcze w Convex storage (do backfillu). */
+export const listUnarchivedInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("tracks").collect();
+    const pending: { userId: Id<"users">; domainId: string; wavAudioIds: string[]; audio: boolean }[] = [];
+    for (const row of rows) {
+      const track = row.data as Track;
+      if (track.status !== "SUCCESS") continue;
+      const variants = track.variants ?? [];
+      const audio = variants.some((v) => v.audioUrl && !v.audioStorageId && !v.audioExpired);
+      const wavAudioIds = variants
+        .filter((v) => v.wavUrl && !v.wavStorageId)
+        .map((v) => v.audioId);
+      if (audio || wavAudioIds.length > 0) {
+        pending.push({ userId: row.userId, domainId: row.domainId, audio, wavAudioIds });
+      }
+    }
+    return pending;
   },
 });
 

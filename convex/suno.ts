@@ -288,7 +288,16 @@ export const poll = internalAction({
         domainId,
         patch: update,
       });
-      if (update.status === "SUCCESS" || update.status === "FAILED") return;
+      if (update.status === "SUCCESS") {
+        // Suno kasuje pliki po 14 dniach — od razu kopiujemy je do Convex storage
+        await ctx.scheduler.runAfter(0, internal.archive.archiveTrack, {
+          userId,
+          domainId,
+          attempt: 0,
+        });
+        return;
+      }
+      if (update.status === "FAILED") return;
     } catch {
       // ponytail: chwilowy błąd sieci nie przerywa pollingu — próbujemy dalej
     }
@@ -317,13 +326,19 @@ export const convertToWav = action({
     if (existing) return existing;
 
     const url = await runWavConversion(settings.sunoKey, track.taskId, audioId);
-    const variants = (track.variants ?? []).map((v) =>
-      v.audioId === audioId ? { ...v, wavUrl: url } : v
-    );
-    await ctx.runMutation(internal.tracks.patchInternal, {
+    // patch jednego wariantu — równolegle archiwizacja MP3 może zmieniać variants
+    await ctx.runMutation(internal.tracks.patchVariantInternal, {
       userId,
       domainId,
-      patch: { variants },
+      audioId,
+      fields: { wavUrl: url },
+    });
+    // klient pobiera od razu link Suno; kopia do storage leci w tle
+    await ctx.scheduler.runAfter(0, internal.archive.archiveWav, {
+      userId,
+      domainId,
+      audioId,
+      attempt: 0,
     });
     return url;
   },

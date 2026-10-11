@@ -492,6 +492,12 @@ export default function LibraryView({
               </div>
             )}
 
+            {variant?.audioExpired && (
+              <p className="error">
+                Plik audio wygasł na serwerach Suno (trzymają pliki 14 dni), zanim trafił do archiwum.
+              </p>
+            )}
+
             {(track.status === "SUCCESS" || track.status === "FIRST_SUCCESS") && variant && (
               <Player
                 key={variant.audioId}
@@ -506,7 +512,7 @@ export default function LibraryView({
                   <Download size={14} /> Pobierz MP3
                 </button>
               )}
-              {track.status === "SUCCESS" && variant && (
+              {track.status === "SUCCESS" && variant && (variant.wavUrl || !variant.audioExpired) && (
                 <button
                   onClick={() => downloadWav(track, variant, selectedIndex)}
                   disabled={wavBusy === track.id}
