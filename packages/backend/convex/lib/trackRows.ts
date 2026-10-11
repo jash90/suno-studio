@@ -28,8 +28,7 @@ export async function releaseCoverFile(
 ) {
   const rows = await rowsOfUser(ctx, userId);
   const stillUsed = rows.some(
-    (r) =>
-      !exceptDomainIds.includes(r.domainId) && (r.data as Track).aiImageStorageId === storageId
+    (r) => !exceptDomainIds.includes(r.domainId) && (r.data as Track).aiImageStorageId === storageId
   );
   if (!stillUsed) await ctx.storage.delete(storageId as Id<"_storage">);
 }

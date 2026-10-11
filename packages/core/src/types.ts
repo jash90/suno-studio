@@ -180,12 +180,7 @@ export interface Playback {
   repeat: boolean; // po ostatnim utworze wróć do pierwszego
 }
 
-export type TrackStatus =
-  | "PENDING"
-  | "TEXT_SUCCESS"
-  | "FIRST_SUCCESS"
-  | "SUCCESS"
-  | "FAILED";
+export type TrackStatus = "PENDING" | "TEXT_SUCCESS" | "FIRST_SUCCESS" | "SUCCESS" | "FAILED";
 
 /** Jeden z dwóch wariantów, które Suno generuje w ramach jednego zadania. */
 export interface TrackVariant {

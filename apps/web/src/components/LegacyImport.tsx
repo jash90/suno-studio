@@ -17,7 +17,10 @@ export default function LegacyImport({ desktop }: { desktop: DesktopFeatures }) 
   const importBatch = useMutation(api.legacyImport.importBatch);
 
   useEffect(() => {
-    void desktop.readLegacyData().then(setData).catch(() => setData(null));
+    void desktop
+      .readLegacyData()
+      .then(setData)
+      .catch(() => setData(null));
   }, [desktop]);
 
   if (!data && !status) return null;

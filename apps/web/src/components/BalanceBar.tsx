@@ -22,7 +22,8 @@ export default function BalanceBar({ balances, refreshing, onRefresh }: Props) {
       key: "suno",
       icon: <Coins size={13} />,
       label: `Suno: ${fmt(balances.suno)}`,
-      title: balances.suno === null ? "Nie udało się pobrać kredytów Suno" : "Pozostałe kredyty Suno",
+      title:
+        balances.suno === null ? "Nie udało się pobrać kredytów Suno" : "Pozostałe kredyty Suno",
     });
   }
   if (balances.anthropic !== undefined) {

@@ -152,7 +152,9 @@ export default function CreateView({
           Model Suno
           <select value={sunoModel} onChange={(e) => setSunoModel(e.target.value as SunoModel)}>
             {SUNO_MODELS.map((m) => (
-              <option key={m} value={m}>{m.replace(/_/g, ".")}</option>
+              <option key={m} value={m}>
+                {m.replace(/_/g, ".")}
+              </option>
             ))}
           </select>
         </label>
@@ -173,7 +175,9 @@ export default function CreateView({
             <select value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
               <option value="">Brak — nowy głos</option>
               {personas.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </label>
@@ -193,19 +197,29 @@ export default function CreateView({
       )}
 
       <button className="btn-primary" onClick={writeLyrics} disabled={writing}>
-        {writing ? "AI pisze tekst..." : <><PenLine size={16} /> Napisz tekst (AI)</>}
+        {writing ? (
+          "AI pisze tekst..."
+        ) : (
+          <>
+            <PenLine size={16} /> Napisz tekst (AI)
+          </>
+        )}
       </button>
 
-      {usedSources && (
-        <p className="hint">Użyte fragmenty z biblioteki: {usedSources}</p>
-      )}
+      {usedSources && <p className="hint">Użyte fragmenty z biblioteki: {usedSources}</p>}
 
       {draft && (
         <>
           <h2>3. Piosenka (możesz edytować)</h2>
           <SongEditor draft={draft} sunoModel={sunoModel} onChange={setDraft} />
           <button className="btn-primary" onClick={generateMusic} disabled={sending}>
-            {sending ? "Wysyłanie do Suno..." : <><Music size={16} /> Generuj muzykę</>}
+            {sending ? (
+              "Wysyłanie do Suno..."
+            ) : (
+              <>
+                <Music size={16} /> Generuj muzykę
+              </>
+            )}
           </button>
         </>
       )}

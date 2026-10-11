@@ -22,7 +22,11 @@ describe("cover.reset", () => {
     const t = setup();
     const { userId, as } = await signedIn(t);
     const storageId = await storeFile(t);
-    const track = makeTrack({ aiImageUrl: "https://x/ai", aiImageStorageId: storageId, coverSource: "ai" });
+    const track = makeTrack({
+      aiImageUrl: "https://x/ai",
+      aiImageStorageId: storageId,
+      coverSource: "ai",
+    });
     await insertTrack(t, userId, track);
 
     expect(await as.mutation(api.cover.reset, { domainIds: [track.id] })).toBe(1);

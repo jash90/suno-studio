@@ -90,10 +90,12 @@ function SignIn() {
   return (
     <div className="app-loading">
       <form className="signin" onSubmit={submit}>
-        <h1><Headphones size={20} /> Suno Studio</h1>
+        <h1>
+          <Headphones size={20} /> Suno Studio
+        </h1>
         <p className="hint">
-          {flow === "signIn" ? "Zaloguj się" : "Załóż konto"} — dane i klucze API
-          zapisują się na Twoim koncie.
+          {flow === "signIn" ? "Zaloguj się" : "Załóż konto"} — dane i klucze API zapisują się na
+          Twoim koncie.
         </p>
         <input name="email" type="email" placeholder="E-mail" required autoComplete="email" />
         <input
@@ -315,7 +317,9 @@ function Studio() {
     <div className="app">
       <header className="topbar">
         <div className="topbar-left">
-          <h1><Headphones size={18} /> Suno Studio</h1>
+          <h1>
+            <Headphones size={18} /> Suno Studio
+          </h1>
           {settings.showBalances && (
             <BalanceBar
               balances={balances}

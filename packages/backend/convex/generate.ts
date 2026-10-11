@@ -43,11 +43,7 @@ export const generateSongAction = action({
         const guideDocs = active.filter((d) => d.kind === "guide");
         const chunks = retrieveChunks(contentDocs, brief);
         context = buildContext(chunks);
-        const guideChunks = retrieveChunks(
-          guideDocs,
-          `${brief} ${GUIDE_QUERY_SUFFIX}`,
-          6
-        );
+        const guideChunks = retrieveChunks(guideDocs, `${brief} ${GUIDE_QUERY_SUFFIX}`, 6);
         guides = buildContext(guideChunks);
         const parts = [
           chunks.length > 0 ? `źródła: ${summarizeSources(chunks)}` : null,

@@ -37,14 +37,7 @@ export default function FileDrop({ onFiles, busy }: Props) {
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept={ACCEPT}
-        hidden
-        onChange={handlePick}
-      />
+      <input ref={inputRef} type="file" multiple accept={ACCEPT} hidden onChange={handlePick} />
       {busy
         ? "Wczytywanie plików..."
         : "Przeciągnij pliki tutaj lub kliknij, aby wybrać (txt, md, pdf, docx)"}

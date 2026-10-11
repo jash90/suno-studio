@@ -1,40 +1,23 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import {
-  internalQuery,
-  mutation,
-  MutationCtx,
-  query,
-  QueryCtx,
-} from "./_generated/server";
+import { internalQuery, mutation, MutationCtx, query, QueryCtx } from "./_generated/server";
 import { DocKind, LibraryDoc } from "@suno/core";
 
-async function readLibrary(
-  ctx: QueryCtx,
-  userId: Id<"users">
-): Promise<LibraryDoc[]> {
+async function readLibrary(ctx: QueryCtx, userId: Id<"users">): Promise<LibraryDoc[]> {
   const rows = await ctx.db
     .query("library")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .collect();
   return rows
     .map((r) => r.data as LibraryDoc)
-    .sort(
-      (a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
-    );
+    .sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime());
 }
 
-async function findRow(
-  ctx: MutationCtx,
-  userId: Id<"users">,
-  domainId: string
-) {
+async function findRow(ctx: MutationCtx, userId: Id<"users">, domainId: string) {
   return ctx.db
     .query("library")
-    .withIndex("by_user_domain", (q) =>
-      q.eq("userId", userId).eq("domainId", domainId)
-    )
+    .withIndex("by_user_domain", (q) => q.eq("userId", userId).eq("domainId", domainId))
     .unique();
 }
 

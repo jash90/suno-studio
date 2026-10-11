@@ -150,7 +150,12 @@ export default function AlbumHeader({
                   <button
                     key={m}
                     className={(tracks[0]?.coverSource ?? "suno") === m ? "active" : ""}
-                    onClick={() => void onSetCoverSource(tracks.map((t) => t.id), m)}
+                    onClick={() =>
+                      void onSetCoverSource(
+                        tracks.map((t) => t.id),
+                        m
+                      )
+                    }
                   >
                     {m === "ai" ? "AI" : "Suno"}
                   </button>

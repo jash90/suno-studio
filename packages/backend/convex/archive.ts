@@ -41,7 +41,10 @@ async function store(ctx: ActionCtx, blob: Blob): Promise<{ storageId: string; u
 /** Wczytuje utwór; starsze wpisy mają tylko pola płaskie — zapisujemy je jako
  *  wariant A, żeby archiwizacja (i oznaczanie wygasłych) objęła też je. */
 async function loadTrack(ctx: ActionCtx, userId: Id<"users">, domainId: string) {
-  const track = (await ctx.runQuery(internal.tracks.getInternal, { userId, domainId })) as Track | null;
+  const track = (await ctx.runQuery(internal.tracks.getInternal, {
+    userId,
+    domainId,
+  })) as Track | null;
   if (!track || (track.variants?.length ?? 0) > 0 || !track.audioId) return track;
   const variants = getVariants(track);
   await ctx.runMutation(internal.tracks.patchInternal, { userId, domainId, patch: { variants } });

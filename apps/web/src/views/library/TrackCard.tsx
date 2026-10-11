@@ -37,10 +37,7 @@ function TrackProgress({ track, now }: { track: Track; now: number }) {
   return (
     <div className="progress-wrap">
       <div className="progress">
-        <div
-          className="progress-bar"
-          style={{ width: `${STATUS_PROGRESS[track.status] ?? 0}%` }}
-        />
+        <div className="progress-bar" style={{ width: `${STATUS_PROGRESS[track.status] ?? 0}%` }} />
       </div>
       <span className="progress-label">
         <Loader2 size={13} className="spin" />{" "}
@@ -110,7 +107,12 @@ export interface TrackActions {
   onDelete: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
   onRegenerate: (id: string) => Promise<void>;
-  onCreatePersona: (track: Track, audioId: string, name: string, description: string) => Promise<void>;
+  onCreatePersona: (
+    track: Track,
+    audioId: string,
+    name: string,
+    description: string
+  ) => Promise<void>;
   onConvertToWav: (domainId: string, audioId: string) => Promise<string>;
   onGenerateCover: (domainId: string) => Promise<void>;
   onSetCoverSource: (domainIds: string[], source: "suno" | "ai") => Promise<void>;

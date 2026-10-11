@@ -131,7 +131,11 @@ describe("LLM response parsing", () => {
   });
 
   it("parses an album concept and rejects an empty plan", () => {
-    const concept = { albumTitle: "X", styleDirection: "folk", songs: [{ title: "a", brief: "b", styleHints: "c" }] };
+    const concept = {
+      albumTitle: "X",
+      styleDirection: "folk",
+      songs: [{ title: "a", brief: "b", styleHints: "c" }],
+    };
     expect(parseAlbumConcept(`plan: ${JSON.stringify(concept)}`)).toEqual(concept);
     expect(() => parseAlbumConcept('{"albumTitle": "X", "songs": []}')).toThrow(/planu albumu/);
   });
@@ -141,7 +145,14 @@ describe("track variants", () => {
   it("builds variant A from legacy flat fields", () => {
     const variants = getVariants(track({ audioId: "a1", audioUrl: "u" }));
     expect(variants).toEqual([
-      { audioId: "a1", audioUrl: "u", streamAudioUrl: undefined, imageUrl: undefined, duration: undefined, wavUrl: undefined },
+      {
+        audioId: "a1",
+        audioUrl: "u",
+        streamAudioUrl: undefined,
+        imageUrl: undefined,
+        duration: undefined,
+        wavUrl: undefined,
+      },
     ]);
     expect(getVariants(track())).toEqual([]);
   });

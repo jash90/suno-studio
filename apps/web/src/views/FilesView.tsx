@@ -52,11 +52,10 @@ export default function FilesView({ library, onAdd, onToggleKind, onRemove }: Pr
     <div className="view">
       <h2>Biblioteka plików</h2>
       <p className="hint">
-        Pliki dodajesz raz — treść jest indeksowana. Przy każdej generacji aplikacja
-        sama dobierze fragmenty pasujące do briefu (nie wysyła całej biblioteki do AI).
-        Każdy plik ma rolę: <strong>źródło</strong> (materiał na treść piosenki) lub{" "}
-        <strong>poradnik</strong> (wytyczne stylu/tagów Suno dla AI — nie trafia do
-        tekstu utworu). Rolę zmienisz klikając etykietę.
+        Pliki dodajesz raz — treść jest indeksowana. Przy każdej generacji aplikacja sama dobierze
+        fragmenty pasujące do briefu (nie wysyła całej biblioteki do AI). Każdy plik ma rolę:{" "}
+        <strong>źródło</strong> (materiał na treść piosenki) lub <strong>poradnik</strong> (wytyczne
+        stylu/tagów Suno dla AI — nie trafia do tekstu utworu). Rolę zmienisz klikając etykietę.
       </p>
       <FileDrop onFiles={(files) => void addFiles(files)} busy={busy} />
       {error && <p className="error">{error}</p>}
@@ -68,16 +67,22 @@ export default function FilesView({ library, onAdd, onToggleKind, onRemove }: Pr
           <ul className="filedrop-list">
             {library.map((doc) => (
               <li key={doc.id}>
-                <span className="file-name" title={doc.path}>{doc.name}</span>
+                <span className="file-name" title={doc.path}>
+                  {doc.name}
+                </span>
                 <button
                   className={`badge badge-kind-${doc.kind}`}
                   title="Kliknij, aby zmienić rolę pliku"
                   onClick={() => onToggleKind(doc.id)}
                 >
                   {doc.kind === "guide" ? (
-                    <><BookOpen size={12} /> poradnik</>
+                    <>
+                      <BookOpen size={12} /> poradnik
+                    </>
                   ) : (
-                    <><FileText size={12} /> źródło</>
+                    <>
+                      <FileText size={12} /> źródło
+                    </>
                   )}
                 </button>
                 <span className="file-chars">{doc.chunks.length} fragm.</span>

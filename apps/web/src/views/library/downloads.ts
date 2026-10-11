@@ -73,7 +73,12 @@ export async function downloadWav(
   }
 }
 
-export function downloadCover(track: Track, variant: TrackVariant | undefined, index: number, report: Report) {
+export function downloadCover(
+  track: Track,
+  variant: TrackVariant | undefined,
+  index: number,
+  report: Report
+) {
   const url = activeCover(track, variant);
   if (!url) return Promise.resolve();
   const name = `${sanitizeFileName(variantName(track, index))}.${coverExt(url, track)}`;
@@ -119,7 +124,7 @@ export function downloadAlbum(
         try {
           const url =
             format === "wav"
-              ? variant.wavUrl ?? (await convert(track.id, variant.audioId))
+              ? (variant.wavUrl ?? (await convert(track.id, variant.audioId)))
               : variant.audioUrl;
           if (!url) throw new Error("brak pliku audio");
           files.push({

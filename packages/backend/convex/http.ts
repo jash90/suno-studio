@@ -62,10 +62,7 @@ const download = httpAction(async (ctx, request) => {
     return new Response(`Upstream ${upstream.status}`, { status: 502, headers: CORS });
   }
   const headers = new Headers();
-  headers.set(
-    "Content-Type",
-    upstream.headers.get("Content-Type") ?? "application/octet-stream"
-  );
+  headers.set("Content-Type", upstream.headers.get("Content-Type") ?? "application/octet-stream");
   const len = upstream.headers.get("Content-Length");
   if (len) headers.set("Content-Length", len);
   headers.set("Access-Control-Allow-Origin", "*");

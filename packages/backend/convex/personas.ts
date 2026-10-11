@@ -14,10 +14,7 @@ export const list = query({
       .collect();
     return rows
       .map((r) => r.data as Persona)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 });
 

@@ -1,12 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import {
-  internalMutation,
-  internalQuery,
-  mutation,
-  query,
-} from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { canRegenerate, getVariants, Track } from "@suno/core";
 import { findTrackRow, releaseCoverFile } from "./lib/trackRows";
 
@@ -24,10 +19,7 @@ export const list = query({
     // najnowsze pierwsze — jak dawna historia
     return rows
       .map((r) => r.data as Track)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 });
 
@@ -69,9 +61,7 @@ export const getInternal = internalQuery({
   handler: async (ctx, { userId, domainId }): Promise<Track | null> => {
     const row = await ctx.db
       .query("tracks")
-      .withIndex("by_user_domain", (q) =>
-        q.eq("userId", userId).eq("domainId", domainId)
-      )
+      .withIndex("by_user_domain", (q) => q.eq("userId", userId).eq("domainId", domainId))
       .unique();
     return (row?.data as Track) ?? null;
   },
@@ -173,16 +163,19 @@ export const listUnarchivedInternal = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("tracks").collect();
-    const pending: { userId: Id<"users">; domainId: string; wavAudioIds: string[]; audio: boolean }[] = [];
+    const pending: {
+      userId: Id<"users">;
+      domainId: string;
+      wavAudioIds: string[];
+      audio: boolean;
+    }[] = [];
     for (const row of rows) {
       const track = row.data as Track;
       if (track.status !== "SUCCESS") continue;
       // getVariants: starsze wpisy z polami płaskimi archiveTrack zamieni na wariant A
       const variants = getVariants(track);
       const audio = variants.some((v) => v.audioUrl && !v.audioStorageId && !v.audioExpired);
-      const wavAudioIds = variants
-        .filter((v) => v.wavUrl && !v.wavStorageId)
-        .map((v) => v.audioId);
+      const wavAudioIds = variants.filter((v) => v.wavUrl && !v.wavStorageId).map((v) => v.audioId);
       if (audio || wavAudioIds.length > 0) {
         pending.push({ userId: row.userId, domainId: row.domainId, audio, wavAudioIds });
       }

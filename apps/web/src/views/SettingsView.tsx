@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { Check, Eye, EyeOff } from "lucide-react";
-import {
-  ANTHROPIC_MODELS,
-  OPENAI_MODELS,
-  Provider,
-  Settings,
-  SunoModel,
-} from "@suno/core";
+import { ANTHROPIC_MODELS, OPENAI_MODELS, Provider, Settings, SunoModel } from "@suno/core";
 import { ALBUM_PROMPT_TEMPLATE, SONG_PROMPT_TEMPLATE } from "@suno/core";
 import platform from "@platform";
 import DesktopSettings from "../components/DesktopSettings";
@@ -26,7 +20,9 @@ function ModelSelect({
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
       {options.map((m) => (
-        <option key={m} value={m}>{m}</option>
+        <option key={m} value={m}>
+          {m}
+        </option>
       ))}
     </select>
   );
@@ -64,11 +60,7 @@ function PromptEditor({
         onChange={(e) => onChange(e.target.value)}
       />
       <span className="doc-picker-actions">
-        <button
-          type="button"
-          className="btn-link"
-          onClick={() => onChange(defaultTemplate)}
-        >
+        <button type="button" className="btn-link" onClick={() => onChange(defaultTemplate)}>
           Wstaw wbudowany do edycji
         </button>
         {isCustom && (
@@ -174,9 +166,9 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
         Pokazuj kredyty Suno i wydatki AI obok logo
       </label>
       <p className="hint">
-        Kredyty Suno działają od razu. Wydatki Anthropic/OpenAI wymagają osobnych
-        kluczy administracyjnych (zwykłe klucze API nie mają dostępu do rozliczeń) —
-        pokazywana jest suma wydatków w bieżącym miesiącu.
+        Kredyty Suno działają od razu. Wydatki Anthropic/OpenAI wymagają osobnych kluczy
+        administracyjnych (zwykłe klucze API nie mają dostępu do rozliczeń) — pokazywana jest suma
+        wydatków w bieżącym miesiącu.
       </p>
       <KeyInput
         label="Klucz Anthropic Admin (opcjonalny)"
@@ -226,7 +218,9 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
             onChange={(e) => set("sunoModel", e.target.value as SunoModel)}
           >
             {(["V4", "V4_5", "V4_5PLUS", "V4_5ALL", "V5", "V5_5"] as SunoModel[]).map((m) => (
-              <option key={m} value={m}>{m.replace(/_/g, ".")}</option>
+              <option key={m} value={m}>
+                {m.replace(/_/g, ".")}
+              </option>
             ))}
           </select>
         </label>
@@ -234,10 +228,10 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
 
       <h2>Prompty systemowe AI</h2>
       <p className="hint">
-        Puste pole = wbudowany prompt. Brief i poradniki z biblioteki są zawsze
-        doklejane automatycznie na końcu. Placeholdery podmieniane przy generacji:
-        piosenka — {"{MAX_STYLE}"}, {"{MAX_LYRICS}"}, {"{MAX_TITLE}"} (limity
-        wybranego modelu Suno); album — {"{SONG_COUNT}"} (liczba utworów).
+        Puste pole = wbudowany prompt. Brief i poradniki z biblioteki są zawsze doklejane
+        automatycznie na końcu. Placeholdery podmieniane przy generacji: piosenka — {"{MAX_STYLE}"},{" "}
+        {"{MAX_LYRICS}"}, {"{MAX_TITLE}"} (limity wybranego modelu Suno); album — {"{SONG_COUNT}"}{" "}
+        (liczba utworów).
       </p>
       <PromptEditor
         label="Prompt generowania piosenki"
@@ -260,7 +254,11 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
           Sprawdź kredyty Suno
         </button>
       </div>
-      {saved && <p className="info"><Check size={14} /> Zapisano</p>}
+      {saved && (
+        <p className="info">
+          <Check size={14} /> Zapisano
+        </p>
+      )}
       {credits && <p className="info">{credits}</p>}
 
       {platform.desktop && (

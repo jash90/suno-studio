@@ -2,13 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import {
-  action,
-  ActionCtx,
-  internalAction,
-  internalMutation,
-  mutation,
-} from "./_generated/server";
+import { action, ActionCtx, internalAction, internalMutation, mutation } from "./_generated/server";
 import { Track } from "@suno/core";
 import { findTrackRow, releaseCoverFile, rowsOfUser } from "./lib/trackRows";
 import { requireSettings } from "./suno";
@@ -26,9 +20,7 @@ function coverPrompt(title: string, style: string, lyrics?: string): string {
   return (
     `Album cover artwork for a song titled "${title}". ` +
     `Musical style and genre: ${style}. ` +
-    (fragment
-      ? `Mood, themes and imagery inspired by these lyrics: ${fragment}. `
-      : "") +
+    (fragment ? `Mood, themes and imagery inspired by these lyrics: ${fragment}. ` : "") +
     `Square professional album cover, striking composition, no text, no words, no letters, no typography.`
   );
 }
@@ -60,10 +52,7 @@ async function generateImage(openaiKey: string, prompt: string): Promise<Blob> {
 }
 
 /** Zapisuje obraz do Convex storage i zwraca { url, storageId }. */
-async function storeImage(
-  ctx: ActionCtx,
-  blob: Blob
-): Promise<{ url: string; storageId: string }> {
+async function storeImage(ctx: ActionCtx, blob: Blob): Promise<{ url: string; storageId: string }> {
   const storageId = await ctx.storage.store(blob);
   const url = await ctx.storage.getUrl(storageId);
   if (!url) throw new Error("Nie udało się zapisać okładki");

@@ -50,7 +50,10 @@ export interface Platform {
   /** Źródło dla odtwarzacza z falą (wavesurfer musi móc pobrać plik). */
   loadAudio(url: string): Promise<{ src: string; release: () => void }>;
   /** Zapisuje pojedynczy plik. Zwraca miejsce zapisu albo null, gdy anulowano. */
-  saveFile(source: { url?: string; data?: Blob | string }, fileName: string): Promise<string | null>;
+  saveFile(
+    source: { url?: string; data?: Blob | string },
+    fileName: string
+  ): Promise<string | null>;
   /** Zapisuje wiele plików: web → jeden ZIP, desktop → folder `bundleName`. */
   saveBundle(
     files: BundleFile[],

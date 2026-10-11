@@ -5,14 +5,10 @@
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "paths": {
-      "@platform": [
-        "./src/platform/web.ts"
-      ]
+      "@platform": ["./src/platform/web.ts"]
     }
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "references": [
     {
       "path": "./tsconfig.node.json"

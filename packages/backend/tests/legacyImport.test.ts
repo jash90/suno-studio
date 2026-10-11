@@ -22,9 +22,28 @@ describe("legacyImport.importBatch", () => {
     };
     const coverMissing = { ...makeTrack({ coverSource: "ai" }), aiImagePath: "/gone.png" };
     const interrupted = makeTrack({ status: "TEXT_SUCCESS" });
-    const doc = { id: "doc-1", name: "poradnik suno.md", path: "x", chunks: ["a"], addedAt: "2026-07-01" };
-    const persona = { id: "p-1", name: "Głos", description: "d", sourceTrackTitle: "t", createdAt: "2026-07-01" };
-    const album = { id: "al-1", title: "Ogień i Popiół", brief: "", styleDirection: "", songs: [], createdAt: "x" };
+    const doc = {
+      id: "doc-1",
+      name: "poradnik suno.md",
+      path: "x",
+      chunks: ["a"],
+      addedAt: "2026-07-01",
+    };
+    const persona = {
+      id: "p-1",
+      name: "Głos",
+      description: "d",
+      sourceTrackTitle: "t",
+      createdAt: "2026-07-01",
+    };
+    const album = {
+      id: "al-1",
+      title: "Ogień i Popiół",
+      brief: "",
+      styleDirection: "",
+      songs: [],
+      createdAt: "x",
+    };
 
     const payload = {
       settings: legacySettings,

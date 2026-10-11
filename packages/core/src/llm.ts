@@ -77,7 +77,8 @@ export const ALBUM_SCHEMA = {
           },
           styleHints: {
             type: "string",
-            description: "Wskazówki stylu odróżniające ten utwór w ramach kierunku albumu, po angielsku",
+            description:
+              "Wskazówki stylu odróżniające ten utwór w ramach kierunku albumu, po angielsku",
           },
         },
         required: ["title", "brief", "styleHints"],

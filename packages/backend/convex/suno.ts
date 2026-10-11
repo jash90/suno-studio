@@ -29,11 +29,7 @@ interface SunoEnvelope<T> {
   data: T;
 }
 
-async function sunoFetch<T>(
-  path: string,
-  sunoKey: string,
-  init?: RequestInit
-): Promise<T> {
+async function sunoFetch<T>(path: string, sunoKey: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -133,18 +129,12 @@ async function getTaskStatus(sunoKey: string, taskId: string): Promise<TaskUpdat
     default:
       return {
         status: "FAILED",
-        error:
-          ERROR_MESSAGES[data.status] ??
-          data.errorMessage ??
-          `Błąd Suno: ${data.status}`,
+        error: ERROR_MESSAGES[data.status] ?? data.errorMessage ?? `Błąd Suno: ${data.status}`,
       };
   }
 }
 
-export async function requireSettings(
-  ctx: ActionCtx,
-  userId: Id<"users">
-): Promise<Settings> {
+export async function requireSettings(ctx: ActionCtx, userId: Id<"users">): Promise<Settings> {
   const settings = (await ctx.runQuery(internal.settings.getInternal, {
     userId,
   })) as Settings | null;
@@ -413,11 +403,7 @@ export const convertToWav = action({
   },
 });
 
-async function runWavConversion(
-  sunoKey: string,
-  taskId: string,
-  audioId: string
-): Promise<string> {
+async function runWavConversion(sunoKey: string, taskId: string, audioId: string): Promise<string> {
   const res = await fetch(`${BASE}/wav/generate`, {
     method: "POST",
     headers: {

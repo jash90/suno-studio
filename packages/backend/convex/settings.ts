@@ -4,10 +4,7 @@ import { Id } from "./_generated/dataModel";
 import { internalQuery, mutation, query, QueryCtx } from "./_generated/server";
 import { Settings } from "@suno/core";
 
-async function readSettings(
-  ctx: QueryCtx,
-  userId: Id<"users">
-): Promise<Settings | null> {
+async function readSettings(ctx: QueryCtx, userId: Id<"users">): Promise<Settings | null> {
   const row = await ctx.db
     .query("settings")
     .withIndex("by_user", (q) => q.eq("userId", userId))

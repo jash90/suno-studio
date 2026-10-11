@@ -69,7 +69,8 @@ export const importBatch = mutation({
       // generacja przerwana zamknięciem desktopu — polling nie wróci, oznacz jako błąd
       if (!["SUCCESS", "FAILED"].includes(legacy.status)) {
         track.status = "FAILED";
-        track.error = "Generacja przerwana przed migracją z aplikacji desktopowej — wygeneruj ponownie";
+        track.error =
+          "Generacja przerwana przed migracją z aplikacji desktopowej — wygeneruj ponownie";
       }
       await ctx.db.insert("tracks", { userId, domainId: legacy.id, data: track });
       result.tracks++;
@@ -140,7 +141,10 @@ async function importSettings(
     .query("settings")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
-  const current: Record<string, unknown> = { ...DEFAULT_SETTINGS, ...((row?.data as Settings) ?? {}) };
+  const current: Record<string, unknown> = {
+    ...DEFAULT_SETTINGS,
+    ...((row?.data as Settings) ?? {}),
+  };
   let changed = false;
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
     const value = legacy[key];

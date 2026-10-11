@@ -14,11 +14,7 @@ function tokenize(text: string): string[] {
 const K1 = 1.5;
 const B = 0.75;
 
-export function retrieveChunks(
-  docs: LibraryDoc[],
-  query: string,
-  k = 8
-): RetrievedChunk[] {
+export function retrieveChunks(docs: LibraryDoc[], query: string, k = 8): RetrievedChunk[] {
   const all: { docName: string; text: string; tokens: string[] }[] = [];
   for (const doc of docs) {
     for (const chunk of doc.chunks) {
@@ -60,9 +56,7 @@ export function retrieveChunks(
       const tf = chunk.tokens.filter((t) => t === term).length;
       if (tf === 0) continue;
       const idf = Math.log(1 + (N - df.get(term)! + 0.5) / (df.get(term)! + 0.5));
-      score +=
-        (idf * tf * (K1 + 1)) /
-        (tf + K1 * (1 - B + (B * chunk.tokens.length) / avgLen));
+      score += (idf * tf * (K1 + 1)) / (tf + K1 * (1 - B + (B * chunk.tokens.length) / avgLen));
     }
     return { docName: chunk.docName, text: chunk.text, score };
   });
@@ -75,9 +69,7 @@ export function retrieveChunks(
 
 /** Buduje blok kontekstu dla LLM z pobranych fragmentów. */
 export function buildContext(chunks: RetrievedChunk[]): string {
-  return chunks
-    .map((c) => `=== Fragment z: ${c.docName} ===\n${c.text}`)
-    .join("\n\n");
+  return chunks.map((c) => `=== Fragment z: ${c.docName} ===\n${c.text}`).join("\n\n");
 }
 
 /** Zwięzłe podsumowanie użytych źródeł, np. "notatki.md (3), praca.pdf (2)". */

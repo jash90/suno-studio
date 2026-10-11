@@ -186,7 +186,9 @@ export default function AlbumView({
           Liczba utworów
           <select value={songCount} onChange={(e) => setSongCount(Number(e.target.value))}>
             {[3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </select>
         </label>
@@ -201,7 +203,9 @@ export default function AlbumView({
           Model Suno
           <select value={sunoModel} onChange={(e) => setSunoModel(e.target.value as SunoModel)}>
             {SUNO_MODELS.map((m) => (
-              <option key={m} value={m}>{m.replace(/_/g, ".")}</option>
+              <option key={m} value={m}>
+                {m.replace(/_/g, ".")}
+              </option>
             ))}
           </select>
         </label>
@@ -229,7 +233,9 @@ export default function AlbumView({
             <select value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
               <option value="">Brak — nowy głos</option>
               {personas.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </label>
@@ -250,9 +256,13 @@ export default function AlbumView({
 
       <button className="btn-primary" onClick={planAlbum} disabled={planning || writing}>
         {planning ? (
-          <><Loader2 size={16} className="spin" /> AI planuje album...</>
+          <>
+            <Loader2 size={16} className="spin" /> AI planuje album...
+          </>
         ) : (
-          <><Disc3 size={16} /> Zaplanuj album</>
+          <>
+            <Disc3 size={16} /> Zaplanuj album
+          </>
         )}
       </button>
 
@@ -287,19 +297,30 @@ export default function AlbumView({
               disabled={writing || doneCount === album.songs.length}
             >
               {writing ? (
-                <><Loader2 size={16} className="spin" /> Piosenka {writingIndex + 1}/{album.songs.length}...</>
+                <>
+                  <Loader2 size={16} className="spin" /> Piosenka {writingIndex + 1}/
+                  {album.songs.length}...
+                </>
               ) : doneCount > 0 && doneCount < album.songs.length ? (
-                <><RotateCcw size={16} /> Wznów pisanie tekstów ({doneCount}/{album.songs.length})</>
+                <>
+                  <RotateCcw size={16} /> Wznów pisanie tekstów ({doneCount}/{album.songs.length})
+                </>
               ) : (
-                <><PenLine size={16} /> Generuj teksty (po kolei)</>
+                <>
+                  <PenLine size={16} /> Generuj teksty (po kolei)
+                </>
               )}
             </button>
             {writtenCount > 0 && (
               <button className="btn-primary" onClick={sendAll} disabled={sendingAll || writing}>
                 {sendingAll ? (
-                  <><Loader2 size={16} className="spin" /> Wysyłanie...</>
+                  <>
+                    <Loader2 size={16} className="spin" /> Wysyłanie...
+                  </>
                 ) : (
-                  <><Music size={16} /> Generuj muzykę dla wszystkich ({writtenCount})</>
+                  <>
+                    <Music size={16} /> Generuj muzykę dla wszystkich ({writtenCount})
+                  </>
                 )}
               </button>
             )}

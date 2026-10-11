@@ -1,4 +1,14 @@
-import { ArrowDown, ArrowUp, Disc3, Repeat, Shuffle, SkipBack, SkipForward, Square, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Disc3,
+  Repeat,
+  Shuffle,
+  SkipBack,
+  SkipForward,
+  Square,
+  X,
+} from "lucide-react";
 import Waveform from "../components/Waveform";
 import { Playback } from "@suno/core";
 
@@ -16,8 +26,8 @@ export default function PlayerView({ playback, onSeekTo, onStop, onChange }: Pro
     return (
       <div className="view">
         <p className="empty">
-          Nic nie gra — uruchom album przyciskiem „Odtwórz album" w Bibliotece
-          albo dodaj utwory przyciskiem „Do kolejki".
+          Nic nie gra — uruchom album przyciskiem „Odtwórz album" w Bibliotece albo dodaj utwory
+          przyciskiem „Do kolejki".
         </p>
       </div>
     );
@@ -102,10 +112,7 @@ export default function PlayerView({ playback, onSeekTo, onStop, onChange }: Pro
         <ol className="album-queue open">
           {queue.map((q, i) => (
             <li key={i}>
-              <button
-                className={i === index ? "active" : ""}
-                onClick={() => onSeekTo(i)}
-              >
+              <button className={i === index ? "active" : ""} onClick={() => onSeekTo(i)}>
                 {i === index ? "▸ " : ""}
                 {q.label}
               </button>
@@ -126,11 +133,7 @@ export default function PlayerView({ playback, onSeekTo, onStop, onChange }: Pro
                 >
                   <ArrowDown size={13} />
                 </button>
-                <button
-                  className="btn-icon"
-                  title="Usuń z kolejki"
-                  onClick={() => removeAt(i)}
-                >
+                <button className="btn-icon" title="Usuń z kolejki" onClick={() => removeAt(i)}>
                   <X size={13} />
                 </button>
               </span>

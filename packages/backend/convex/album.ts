@@ -26,10 +26,7 @@ import { buildContext, retrieveChunks } from "@suno/core";
 const GUIDE_QUERY_SUFFIX =
   "styl gatunek tagi suno struktura piosenki style tags vocal ambience intro outro chorus verse bridge instrumental meta tags";
 
-async function readAlbum(
-  ctx: QueryCtx,
-  userId: Id<"users">
-): Promise<Album | null> {
+async function readAlbum(ctx: QueryCtx, userId: Id<"users">): Promise<Album | null> {
   const row = await ctx.db
     .query("albums")
     .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -113,11 +110,7 @@ export const patchSongInternal = internalMutation({
   },
 });
 
-function retrieveGuides(
-  docs: LibraryDoc[],
-  useLibrary: boolean,
-  query: string
-): string {
+function retrieveGuides(docs: LibraryDoc[], useLibrary: boolean, query: string): string {
   if (!useLibrary) return "";
   const guideDocs = docs.filter((d) => d.kind === "guide");
   if (guideDocs.length === 0) return "";
@@ -151,13 +144,7 @@ export const plan = action({
         )
       : [];
     const guides = retrieveGuides(docs, useLibrary, brief);
-    return generateAlbumConcept(
-      provider as Provider,
-      settings,
-      brief,
-      songCount,
-      guides
-    );
+    return generateAlbumConcept(provider as Provider, settings, brief, songCount, guides);
   },
 });
 
@@ -199,12 +186,7 @@ export const writeLyrics = action({
       })) as Album | null;
       if (!album) return; // album usunięty w trakcie
       const song = album.songs[i];
-      if (
-        !song ||
-        song.status === "written" ||
-        song.status === "sent" ||
-        song.status === "writing"
-      )
+      if (!song || song.status === "written" || song.status === "sent" || song.status === "writing")
         continue;
       await ctx.runMutation(internal.album.patchSongInternal, {
         userId,
