@@ -145,9 +145,9 @@ export const patchVariantInternal = internalMutation({
     fields: v.any(),
     clear: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { userId, domainId, audioId, fields, clear = [] }) => {
+  handler: async (ctx, { userId, domainId, audioId, fields, clear = [] }): Promise<boolean> => {
     const row = await findRow(ctx, userId, domainId);
-    if (!row) return;
+    if (!row) return false;
     const track = row.data as Track;
     const variants = (track.variants ?? []).map((variant) =>
       variant.audioId === audioId ? merge(variant, fields, clear) : variant
@@ -157,6 +157,7 @@ export const patchVariantInternal = internalMutation({
       next = merge(next, fields, clear, ["audioUrl", "streamAudioUrl", "wavUrl"]);
     }
     await ctx.db.patch(row._id, { data: next });
+    return true;
   },
 });
 

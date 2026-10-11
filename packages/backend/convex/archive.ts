@@ -5,31 +5,13 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { ActionCtx, internalAction } from "./_generated/server";
-import { getVariants, Track } from "@suno/core";
+import { fetchArchiveSource, getVariants, Track } from "@suno/core";
 
-// sunoapi.org: "Generated files are retained for 14 days" — po tym czasie
-// tempfile CDN zwraca 404, a stream 403. Kopiujemy pliki do Convex storage.
-const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const RETRY_MS = 60_000;
 
-type Fetched = { blob: Blob } | { gone: true } | { retry: true };
-
-/** Pobiera plik z CDN Suno. 403/404 traktujemy jako „wygasł" tylko dla starych
- *  utworów — świeżo po SUCCESS CDN bywa jeszcze niespójny, wtedy ponawiamy. */
-async function fetchSource(url: string, track: Track): Promise<Fetched> {
-  try {
-    const res = await fetch(url);
-    if (res.ok) return { blob: await res.blob() };
-    // generatedAt: przegenerowany utwór ma stare createdAt, ale świeże pliki
-    const generatedAt = new Date(track.generatedAt ?? track.createdAt).getTime();
-    const old = Date.now() - generatedAt > RETENTION_MS - 24 * 60 * 60 * 1000;
-    if (old && [403, 404, 410].includes(res.status)) return { gone: true };
-  } catch {
-    // chwilowy błąd sieci — ponowimy
-  }
-  return { retry: true };
-}
+// Pobieranie z CDN Suno (z rozpoznaniem wygasłych plików) — wspólne z desktopem
+const fetchSource = (url: string, track: Track) => fetchArchiveSource(fetch, url, track);
 
 async function store(ctx: ActionCtx, blob: Blob): Promise<{ storageId: string; url: string }> {
   const storageId = await ctx.storage.store(blob);
@@ -64,12 +46,14 @@ export const archiveTrack = internalAction({
       const got = await fetchSource(variant.audioUrl, track);
       if ("blob" in got) {
         const { storageId, url } = await store(ctx, got.blob);
-        await ctx.runMutation(internal.tracks.patchVariantInternal, {
+        const attached = await ctx.runMutation(internal.tracks.patchVariantInternal, {
           userId,
           domainId,
           audioId: variant.audioId,
           fields: { audioUrl: url, audioStorageId: storageId, sourceAudioUrl: variant.audioUrl },
         });
+        // utwór (albo konto) usunięty w trakcie pobierania — nie zostawiaj sieroty w storage
+        if (!attached) await ctx.storage.delete(storageId as Id<"_storage">);
       } else if ("gone" in got) {
         // martwe linki chowają odtwarzacz i przyciski pobierania w UI
         await ctx.runMutation(internal.tracks.patchVariantInternal, {
@@ -105,12 +89,14 @@ export const archiveWav = internalAction({
     const got = await fetchSource(variant.wavUrl, track);
     if ("blob" in got) {
       const { storageId, url } = await store(ctx, got.blob);
-      await ctx.runMutation(internal.tracks.patchVariantInternal, {
+      const attached = await ctx.runMutation(internal.tracks.patchVariantInternal, {
         userId,
         domainId,
         audioId,
         fields: { wavUrl: url, wavStorageId: storageId, sourceWavUrl: variant.wavUrl },
       });
+      // utwór (albo konto) usunięty w trakcie pobierania — nie zostawiaj sieroty w storage
+      if (!attached) await ctx.storage.delete(storageId as Id<"_storage">);
     } else if ("gone" in got) {
       await ctx.runMutation(internal.tracks.patchVariantInternal, {
         userId,

@@ -14,19 +14,19 @@ import {
 import {
   Album,
   AlbumConcept,
+  albumSongBrief,
+  albumSongContext,
   AlbumSong,
+  generateAlbumConcept,
+  generateSong,
+  guidesFor,
   LibraryDoc,
-  sanitizeAlbum,
   Provider,
+  sanitizeAlbum,
   Settings,
   SunoModel,
 } from "@suno/core";
-import { generateAlbumConcept, generateSong } from "./lib/llm";
 import { albumSongPatch } from "./validators";
-import { buildContext, retrieveChunks } from "@suno/core";
-
-const GUIDE_QUERY_SUFFIX =
-  "styl gatunek tagi suno struktura piosenki style tags vocal ambience intro outro chorus verse bridge instrumental meta tags";
 
 async function readAlbum(ctx: QueryCtx, userId: Id<"users">): Promise<Album | null> {
   const row = await ctx.db
@@ -115,13 +115,6 @@ export const patchSongInternal = internalMutation({
   },
 });
 
-function retrieveGuides(docs: LibraryDoc[], useLibrary: boolean, query: string): string {
-  if (!useLibrary) return "";
-  const guideDocs = docs.filter((d) => d.kind === "guide");
-  if (guideDocs.length === 0) return "";
-  return buildContext(retrieveChunks(guideDocs, `${query} ${GUIDE_QUERY_SUFFIX}`, 6));
-}
-
 /** Planuje koncept-album (retrieval poradników + LLM) i zwraca gotowy AlbumConcept. */
 export const plan = action({
   args: {
@@ -148,9 +141,9 @@ export const plan = action({
           (d) => !excluded.includes(d.id)
         )
       : [];
-    const guides = retrieveGuides(docs, useLibrary, brief);
+    const guides = guidesFor(docs, brief);
     await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "lyrics" });
-    return generateAlbumConcept(provider as Provider, settings, brief, songCount, guides);
+    return generateAlbumConcept(fetch, provider as Provider, settings, brief, songCount, guides);
   },
 });
 
@@ -177,8 +170,6 @@ export const writeLyrics = action({
           (d) => !excluded.includes(d.id)
         )
       : [];
-    const contentDocs = docs.filter((d) => d.kind !== "guide");
-    const guideDocs = docs.filter((d) => d.kind === "guide");
 
     const start = (await ctx.runQuery(internal.album.getInternal, {
       userId,
@@ -199,19 +190,13 @@ export const writeLyrics = action({
         index: i,
         patch: { status: "writing", error: undefined },
       });
-      const songBrief =
-        `${song.plan.brief}\nWspólny kierunek albumu: ${album.styleDirection}` +
-        `\nWskazówki stylu tego utworu: ${song.plan.styleHints}` +
-        `\nProponowany tytuł: ${song.plan.title}`;
+      const songBrief = albumSongBrief(song, album);
       try {
         // limit przekroczony → błąd ląduje w statusie tej piosenki (jak każdy inny)
         await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "lyrics" });
-        const context =
-          useLibrary && contentDocs.length > 0
-            ? buildContext(retrieveChunks(contentDocs, song.plan.brief))
-            : "";
-        const guides = retrieveGuides(guideDocs, useLibrary, song.plan.brief);
+        const { context, guides } = albumSongContext(docs, song);
         const draft = await generateSong(
+          fetch,
           provider as Provider,
           settings,
           context,

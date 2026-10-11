@@ -5,135 +5,32 @@ import { Id } from "./_generated/dataModel";
 import { action, ActionCtx, internalAction } from "./_generated/server";
 import { callbacksEnabled, callbackUrl } from "./lib/callback";
 import {
+  createSunoPersona,
+  createTask as createSunoTask,
+  freshAttempt,
+  getSunoCredits,
+  getTaskStatus as getSunoTaskStatus,
   PersonaModel,
+  personaOf,
   Provider,
+  runWavConversion,
   Settings,
   SongDraft,
   SunoModel,
   Track,
-  TrackStatus,
-  TrackVariant,
 } from "@suno/core";
 
-const BASE = "https://api.sunoapi.org/api/v1";
-
-const ERROR_MESSAGES: Record<string, string> = {
-  CREATE_TASK_FAILED: "Nie udało się utworzyć zadania w Suno",
-  GENERATE_AUDIO_FAILED: "Generowanie audio nie powiodło się",
-  CALLBACK_EXCEPTION: "Błąd po stronie Suno (callback)",
-  SENSITIVE_WORD_ERROR: "Suno odrzuciło treść jako wrażliwą — zmień tekst lub styl",
-};
-
-interface SunoEnvelope<T> {
-  code: number;
-  msg: string;
-  data: T;
-}
-
-async function sunoFetch<T>(path: string, sunoKey: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sunoKey}`,
-      ...init?.headers,
-    },
-  });
-  const body: SunoEnvelope<T> = await res.json();
-  if (!res.ok || body.code !== 200) {
-    throw new Error(`Suno API (${body.code ?? res.status}): ${body.msg ?? "nieznany błąd"}`);
-  }
-  return body.data;
-}
-
-async function createTask(
+// Klient Suno żyje w @suno/core (wspólny z desktopem) — tu globalny fetch Convex.
+const createTask = (
   sunoKey: string,
   draft: SongDraft,
   model: SunoModel,
   instrumental: boolean,
   persona: { id: string; model: PersonaModel } | undefined,
   callBackUrl: string
-): Promise<string> {
-  const data = await sunoFetch<{ taskId: string }>("/generate", sunoKey, {
-    method: "POST",
-    body: JSON.stringify({
-      customMode: true,
-      instrumental,
-      model,
-      prompt: instrumental ? undefined : draft.lyrics,
-      style: draft.style,
-      title: draft.title,
-      personaId: persona?.id,
-      personaModel: persona?.model,
-      // podpisany URL /suno-callback (lib/callback.ts) albo zaślepka — wtedy sam polling
-      callBackUrl,
-    }),
-  });
-  return data.taskId;
-}
-
-interface TaskUpdate {
-  status: TrackStatus;
-  error?: string;
-  variants?: TrackVariant[];
-  audioId?: string;
-  audioUrl?: string;
-  streamAudioUrl?: string;
-  imageUrl?: string;
-  duration?: number;
-}
-
-interface RecordInfo {
-  status: string;
-  errorMessage?: string | null;
-  response?: {
-    sunoData?: Array<{
-      id?: string;
-      audioUrl?: string;
-      streamAudioUrl?: string;
-      imageUrl?: string;
-      duration?: number;
-    }>;
-  };
-}
-
-async function getTaskStatus(sunoKey: string, taskId: string): Promise<TaskUpdate> {
-  const data = await sunoFetch<RecordInfo>(
-    `/generate/record-info?taskId=${encodeURIComponent(taskId)}`,
-    sunoKey
-  );
-  const sunoData = data.response?.sunoData ?? [];
-  const variants: TrackVariant[] = sunoData
-    .filter((s) => s.id)
-    .map((s) => ({
-      audioId: s.id!,
-      audioUrl: s.audioUrl || undefined,
-      streamAudioUrl: s.streamAudioUrl || undefined,
-      imageUrl: s.imageUrl || undefined,
-      duration: s.duration,
-    }));
-  const first = variants[0];
-  const media = {
-    variants: variants.length > 0 ? variants : undefined,
-    audioId: first?.audioId,
-    audioUrl: first?.audioUrl,
-    streamAudioUrl: first?.streamAudioUrl,
-    imageUrl: first?.imageUrl,
-    duration: first?.duration,
-  };
-  switch (data.status) {
-    case "PENDING":
-    case "TEXT_SUCCESS":
-    case "FIRST_SUCCESS":
-    case "SUCCESS":
-      return { status: data.status as TrackStatus, ...media };
-    default:
-      return {
-        status: "FAILED",
-        error: ERROR_MESSAGES[data.status] ?? data.errorMessage ?? `Błąd Suno: ${data.status}`,
-      };
-  }
-}
+) => createSunoTask(fetch, sunoKey, draft, model, instrumental, persona, callBackUrl);
+const getTaskStatus = (sunoKey: string, taskId: string) =>
+  getSunoTaskStatus(fetch, sunoKey, taskId);
 
 export async function requireSettings(ctx: ActionCtx, userId: Id<"users">): Promise<Settings> {
   const settings = (await ctx.runQuery(internal.settings.getInternal, {
@@ -208,40 +105,6 @@ export const startGeneration = action({
   },
 });
 
-/** Nowa próba generacji w tym samym wierszu biblioteki: czysty obiekt — bez
- *  error/variants/mediów poprzedniego taska — ale z metadanymi utworu (album,
- *  persona, okładka AI, data dodania), żeby nic z biblioteki nie przepadło. */
-function freshAttempt(track: Track, taskId: string): Track {
-  return {
-    id: track.id,
-    taskId,
-    title: track.title,
-    style: track.style,
-    lyrics: track.lyrics,
-    sunoModel: track.sunoModel,
-    provider: track.provider,
-    instrumental: track.instrumental,
-    album: track.album,
-    albumIndex: track.albumIndex,
-    personaUsed: track.personaUsed,
-    personaId: track.personaId,
-    personaModel: track.personaModel,
-    aiImageUrl: track.aiImageUrl,
-    aiImageStorageId: track.aiImageStorageId,
-    coverSource: track.coverSource,
-    previousTaskIds: track.previousTaskIds,
-    status: "PENDING",
-    createdAt: track.createdAt,
-    generatedAt: new Date().toISOString(),
-  };
-}
-
-function personaOf(track: Track) {
-  return track.personaId && track.personaModel
-    ? { id: track.personaId, model: track.personaModel }
-    : undefined;
-}
-
 /** Ponawia nieudaną generację: nowy task Suno z tym samym draftem, w tym samym
  *  wierszu biblioteki. Personę wysyłamy tylko, gdy utwór ma zapisane jej id
  *  (starsze utwory mają samą nazwę). */
@@ -292,12 +155,18 @@ export const regenerateExpired = action({
     const settings = await requireSettings(ctx, userId);
     if (!settings.sunoKey) throw new Error("Brak klucza sunoapi.org — uzupełnij w Ustawieniach");
 
-    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "music" });
     // atomowo: sprawdza, że wszystkie warianty przepadły, i ustawia PENDING
     const previous = (await ctx.runMutation(internal.tracks.claimRegenerationInternal, {
       userId,
       domainId,
     })) as Track;
+    // limit dopiero po udanym zajęciu — drugi klik (odrzucony wyżej) nie jest liczony
+    try {
+      await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "music" });
+    } catch (e) {
+      await ctx.runMutation(internal.tracks.replaceInternal, { userId, domainId, track: previous });
+      throw e;
+    }
 
     let taskId: string;
     try {
@@ -411,7 +280,7 @@ export const convertToWav = action({
     if (existing) return existing;
     await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "wav" });
 
-    const url = await runWavConversion(settings.sunoKey, track.taskId, audioId);
+    const url = await runWavConversion(fetch, settings.sunoKey, track.taskId, audioId);
     // patch jednego wariantu — równolegle archiwizacja MP3 może zmieniać variants
     await ctx.runMutation(internal.tracks.patchVariantInternal, {
       userId,
@@ -430,59 +299,6 @@ export const convertToWav = action({
   },
 });
 
-async function runWavConversion(sunoKey: string, taskId: string, audioId: string): Promise<string> {
-  const res = await fetch(`${BASE}/wav/generate`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sunoKey}`,
-    },
-    body: JSON.stringify({
-      taskId,
-      audioId,
-      callBackUrl: "https://example.com/suno-callback",
-    }),
-  });
-  const body: SunoEnvelope<{ taskId?: string }> = await res.json();
-  let createdTaskId: string;
-  if (body.code === 200 && body.data?.taskId) {
-    createdTaskId = body.data.taskId;
-  } else if (body.code === 409 && body.data?.taskId) {
-    // konwersja już istnieje — 409 zwraca taskId istniejącego rekordu WAV
-    createdTaskId = body.data.taskId;
-  } else {
-    throw new Error(`Suno API (${body.code}): ${body.msg ?? "nieznany błąd"}`);
-  }
-  const deadline = Date.now() + 5 * 60_000;
-  while (Date.now() < deadline) {
-    await sleep(5_000);
-    let info: {
-      successFlag?: string;
-      errorMessage?: string | null;
-      response?: { audioWavUrl?: string };
-    };
-    try {
-      info = await sunoFetch(
-        `/wav/record-info?taskId=${encodeURIComponent(createdTaskId)}`,
-        sunoKey
-      );
-    } catch {
-      continue; // chwilowy błąd sieci — próbujemy dalej
-    }
-    if (info.successFlag === "SUCCESS" && info.response?.audioWavUrl) {
-      return info.response.audioWavUrl;
-    }
-    if (info.successFlag && info.successFlag !== "PENDING") {
-      throw new Error(info.errorMessage || `Konwersja WAV nie powiodła się (${info.successFlag})`);
-    }
-  }
-  throw new Error("Przekroczono czas oczekiwania na konwersję WAV");
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 /** Tworzy personę Suno z ukończonego utworu i zapisuje ją w rejestrze usera. */
 export const createPersona = action({
   args: { domainId: v.string(), audioId: v.string(), name: v.string(), description: v.string() },
@@ -496,18 +312,16 @@ export const createPersona = action({
     })) as Track | null;
     if (!track) throw new Error("Nie znaleziono utworu");
 
-    const data = await sunoFetch<{ personaId: string }>(
-      "/generate/generate-persona",
-      settings.sunoKey,
-      {
-        method: "POST",
-        body: JSON.stringify({ taskId: track.taskId, audioId, name, description }),
-      }
-    );
+    const personaId = await createSunoPersona(fetch, settings.sunoKey, {
+      taskId: track.taskId,
+      audioId,
+      name,
+      description,
+    });
     await ctx.runMutation(internal.personas.addInternal, {
       userId,
       persona: {
-        id: data.personaId,
+        id: personaId,
         name,
         description,
         sourceTrackTitle: track.title,
@@ -525,6 +339,6 @@ export const getCredits = action({
     if (!userId) throw new Error("Niezalogowany");
     const key = sunoKey || (await requireSettings(ctx, userId)).sunoKey;
     if (!key) throw new Error("Brak klucza sunoapi.org");
-    return sunoFetch<number>("/generate/credit", key);
+    return getSunoCredits(fetch, key);
   },
 });

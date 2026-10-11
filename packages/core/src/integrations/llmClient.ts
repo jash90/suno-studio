@@ -1,23 +1,21 @@
 import {
   ALBUM_SCHEMA,
-  AlbumConcept,
-  Provider,
-  SONG_SCHEMA,
-  Settings,
-  SongDraft,
-  SunoModel,
   albumSystemPrompt,
   missingKeyMessage,
   parseAlbumConcept,
   parseDraft,
+  SONG_SCHEMA,
   songSystemPrompt,
   songUserMessage,
-} from "@suno/core";
+} from "../llm";
+import { AlbumConcept, Provider, Settings, SongDraft, SunoModel } from "../types";
+import type { FetchFn } from "./suno";
 
-// Wywołania idą przez Convex action (server-side, globalny fetch) — brak CORS,
-// klucze nigdy nie trafiają do JS przeglądarki. Prompty i parsowanie: @suno/core.
+// Wywołania OpenAI/Anthropic. Web: z akcji Convex (server-side, klucze nie trafiają
+// do przeglądarki); desktop: z lokalnego silnika przez plugin-http (bez CORS).
 
 async function generateWithOpenAI(
+  fetch: FetchFn,
   settings: Settings,
   system: string,
   user: string,
@@ -51,6 +49,7 @@ async function generateWithOpenAI(
 }
 
 async function generateWithAnthropic(
+  fetch: FetchFn,
   settings: Settings,
   system: string,
   user: string,
@@ -90,6 +89,7 @@ function requireKey(provider: Provider, settings: Settings) {
 }
 
 export async function generateSong(
+  fetch: FetchFn,
   provider: Provider,
   settings: Settings,
   context: string,
@@ -102,13 +102,14 @@ export async function generateSong(
   const user = songUserMessage(context);
   const raw =
     provider === "openai"
-      ? await generateWithOpenAI(settings, system, user)
-      : await generateWithAnthropic(settings, system, user);
+      ? await generateWithOpenAI(fetch, settings, system, user)
+      : await generateWithAnthropic(fetch, settings, system, user);
   return parseDraft(raw);
 }
 
 /** Planuje koncept-album: tytuł, wspólny kierunek stylu i briefy kolejnych piosenek. */
 export async function generateAlbumConcept(
+  fetch: FetchFn,
   provider: Provider,
   settings: Settings,
   brief: string,
@@ -120,7 +121,7 @@ export async function generateAlbumConcept(
   const user = `Brief albumu: ${brief}`;
   const raw =
     provider === "openai"
-      ? await generateWithOpenAI(settings, system, user, ALBUM_SCHEMA, "album")
-      : await generateWithAnthropic(settings, system, user, ALBUM_SCHEMA);
+      ? await generateWithOpenAI(fetch, settings, system, user, ALBUM_SCHEMA, "album")
+      : await generateWithAnthropic(fetch, settings, system, user, ALBUM_SCHEMA);
   return parseAlbumConcept(raw);
 }

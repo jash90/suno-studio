@@ -136,3 +136,34 @@ describe("tracks.remove", () => {
     expect(await fileExists(t, cover)).toBe(false);
   });
 });
+
+describe("cover queue edge cases (review fixes)", () => {
+  it("a reset while the image is being generated discards the finished file", async () => {
+    const t = setup();
+    const { userId, as } = await signedIn(t);
+    const track = makeTrack({ album: "X" }); // brak coverStatus = reset już zdjął kolejkę
+    await insertTrack(t, userId, track);
+    const late = await storeFile(t);
+
+    await t.mutation(internal.cover.setTrackCoverInternal, {
+      userId,
+      domainId: track.id,
+      aiImageUrl: "https://x/late",
+      aiImageStorageId: late,
+      onlyIfPending: true,
+    });
+    const [after] = await as.query(api.tracks.list, {});
+    expect(after.aiImageUrl).toBeUndefined();
+    expect(await fileExists(t, late)).toBe(false);
+  });
+
+  it("album covers that failed can be queued again", async () => {
+    const t = setup();
+    const { userId, as } = await signedIn(t);
+    const failed = makeTrack({ album: "X", coverStatus: "error", coverError: "Brak klucza" });
+    await insertTrack(t, userId, failed);
+    expect(await as.mutation(api.cover.generateAlbumCovers, { album: "X" })).toBe(1);
+    const [after] = await as.query(api.tracks.list, {});
+    expect(after.coverStatus).toBe("pending");
+  });
+});
