@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Pause, Play } from "lucide-react";
 import WaveSurfer from "wavesurfer.js";
+import platform from "@platform";
 
 interface Props {
   url: string;
@@ -30,7 +31,6 @@ export default function Waveform({ url, onFinish }: Props) {
     if (!containerRef.current) return;
     const ws = WaveSurfer.create({
       container: containerRef.current,
-      url,
       height: 52,
       waveColor: "#4d4347",
       progressColor: "#f0a03c",
@@ -50,7 +50,27 @@ export default function Waveform({ url, onFinish }: Props) {
     ws.on("pause", () => setPlaying(false));
     ws.on("finish", () => onFinishRef.current());
     ws.on("error", () => onFinishRef.current());
-    return () => ws.destroy();
+
+    // Źródło z warstwy platformy: web podaje URL wprost (CDN ma CORS), desktop
+    // pobiera plik przez plugin-http i podaje blob URL.
+    let release: (() => void) | null = null;
+    let cancelled = false;
+    void platform
+      .loadAudio(url)
+      .then((audio) => {
+        if (cancelled) return audio.release();
+        release = audio.release;
+        return ws.load(audio.src);
+      })
+      .catch(() => {
+        if (!cancelled) onFinishRef.current();
+      });
+
+    return () => {
+      cancelled = true;
+      ws.destroy();
+      release?.();
+    };
   }, [url]);
 
   return (

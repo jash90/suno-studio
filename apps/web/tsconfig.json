@@ -4,8 +4,18 @@
     "useDefineForClassFields": true,
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "paths": {
+      "@platform": [
+        "./src/platform/web.ts"
+      ]
+    }
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ]
 }

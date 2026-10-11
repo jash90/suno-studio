@@ -15,6 +15,10 @@
     "@convex-dev/auth": "^0.0.90",
     "@suno/backend": "*",
     "@suno/core": "*",
+    "@tauri-apps/plugin-dialog": "~2.7.1",
+    "@tauri-apps/plugin-fs": "~2.5.1",
+    "@tauri-apps/plugin-http": "~2.5.9",
+    "@tauri-apps/plugin-store": "~2.4.3",
     "convex": "^1.31.0",
     "jszip": "^3.10.1",
     "lucide-react": "^1.24.0",
@@ -35,16 +39,28 @@
   },
   "nx": {
     "name": "web",
-    "tags": ["scope:frontend", "type:app"],
+    "tags": [
+      "scope:frontend",
+      "type:app"
+    ],
     "targets": {
       "build": {
-        "outputs": ["{projectRoot}/dist"]
+        "outputs": [
+          "{projectRoot}/dist"
+        ]
       },
       "build:tauri": {
         "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production"],
-        "outputs": ["{projectRoot}/dist-tauri"]
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "production",
+          "^production"
+        ],
+        "outputs": [
+          "{projectRoot}/dist-tauri"
+        ]
       }
     }
   }

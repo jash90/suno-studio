@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Disc3, Loader2, Music, PenLine, RotateCcw, Trash2 } from "lucide-react";
 import DocPicker from "../components/DocPicker";
+import platform from "@platform";
 import SongEditor, { validateDraft } from "../components/SongEditor";
 import {
   Album,
@@ -91,7 +92,8 @@ export default function AlbumView({
       setError("Opisz album w briefie — to podstawa całego planu");
       return;
     }
-    if (album && !confirm("Masz już aktywny album — zastąpić go nowym planem?")) return;
+    if (album && !(await platform.confirm("Masz już aktywny album — zastąpić go nowym planem?")))
+      return;
     setPlanning(true);
     try {
       const concept = await onPlan({
@@ -264,8 +266,12 @@ export default function AlbumView({
             <button
               className="btn-danger"
               title="Usuń plan albumu"
-              onClick={() => {
-                if (confirm("Usunąć plan albumu? (utwory wysłane do Suno zostają w Bibliotece)")) {
+              onClick={async () => {
+                if (
+                  await platform.confirm(
+                    "Usunąć plan albumu? (utwory wysłane do Suno zostają w Bibliotece)"
+                  )
+                ) {
                   onAlbumChange(null);
                 }
               }}

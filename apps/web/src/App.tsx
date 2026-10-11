@@ -19,7 +19,7 @@ import {
 import { useAuthActions, useAuthToken } from "@convex-dev/auth/react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "@suno/backend/api";
-import { setDownloadAuthToken } from "./services/download";
+import platform from "@platform";
 import BalanceBar from "./components/BalanceBar";
 import AlbumView from "./views/AlbumView";
 import CreateView from "./views/CreateView";
@@ -121,9 +121,9 @@ function SignIn() {
 
 function Studio() {
   const { signOut } = useAuthActions();
-  // Proxy /download wymaga tokenu — trzymamy aktualny w module download.ts
+  // Proxy /download (web) wymaga tokenu — przekazujemy aktualny do warstwy platformy
   const authToken = useAuthToken();
-  useEffect(() => setDownloadAuthToken(authToken ?? null), [authToken]);
+  useEffect(() => platform.setAuthToken(authToken ?? null), [authToken]);
   // Widok wynika z URL-a; złe/nieznane ścieżki normalizujemy efektem (nie
   // <Navigate>), żeby ani na jeden render nie odmontować zawsze-żywych widoków.
   const { pathname } = useLocation();

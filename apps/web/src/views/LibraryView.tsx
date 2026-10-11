@@ -16,17 +16,12 @@ import {
   UserRound,
 } from "lucide-react";
 import Player from "../components/Player";
-import {
-  beginBusy,
-  downloadFile,
-  downloadText,
-  downloadZip,
-  endBusy,
-  imageExt,
-  sanitizeFileName,
-} from "../services/download";
+import platform from "@platform";
+import { beginBusy, endBusy } from "../platform/busy";
 import {
   canRegenerate,
+  imageExt,
+  sanitizeFileName,
   getVariants,
   isAudioLost,
   Playback,
@@ -34,6 +29,14 @@ import {
   Track,
   TrackVariant,
 } from "@suno/core";
+
+const downloadFile = (url: string, name: string) => platform.saveFile({ url }, name);
+const downloadText = (text: string, name: string) => platform.saveFile({ data: text }, name);
+const downloadZip = (
+  files: { url: string; name: string }[],
+  zipName: string,
+  onProgress?: (done: number, total: number) => void
+) => platform.saveBundle(files, zipName.replace(/\.zip$/, ""), onProgress);
 
 const VARIANT_LETTERS = ["A", "B", "C", "D"];
 
@@ -605,12 +608,12 @@ export default function LibraryView({
                         ? `\n\nPersona „${track.personaUsed}" nie zostanie użyta — utwór nie ma zapisanego jej id.`
                         : "";
                     if (
-                      !window.confirm(
+                      !(await platform.confirm(
                         `Suno wygeneruje NOWĄ wersję „${track.title}" z tym samym tekstem, stylem i modelem — ` +
                           "nagranie będzie inne niż oryginał, którego nie da się odzyskać. " +
                           "Zużyje to kredyty Suno." +
                           personaNote
-                      )
+                      ))
                     )
                       return;
                     setMessage(null);
