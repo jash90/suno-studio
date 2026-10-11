@@ -195,6 +195,13 @@ export interface TrackVariant {
   imageUrl?: string;
   duration?: number;
   wavUrl?: string;
+  // Suno trzyma pliki 14 dni — po SUCCESS kopiujemy je do Convex storage i
+  // podmieniamy audioUrl/wavUrl na trwały URL; source* = oryginalny link Suno.
+  audioStorageId?: string;
+  sourceAudioUrl?: string;
+  wavStorageId?: string;
+  sourceWavUrl?: string;
+  audioExpired?: boolean; // plik wygasł w Suno, zanim zdążyliśmy go skopiować
 }
 
 export interface Track {
