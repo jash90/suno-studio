@@ -5,9 +5,11 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { BrowserRouter, HashRouter } from "react-router-dom";
 import platform from "@platform";
 import App from "./App";
+import { initMonitoring } from "./monitoring";
 import "./styles/index.css";
 
 platform.init();
+initMonitoring();
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 

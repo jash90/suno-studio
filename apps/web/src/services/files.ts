@@ -1,13 +1,12 @@
-import * as pdfjs from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import mammoth from "mammoth";
 import { fileExtension, SourceFile } from "@suno/core";
 
 export { chunkText, MAX_TOTAL_CHARS, SUPPORTED_EXTENSIONS } from "@suno/core";
 
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
+// pdf.js i mammoth (~1 MB) ładowane dopiero przy dodawaniu plików — nie spowalniają startu
 async function extractPdf(data: ArrayBuffer): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
   const doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise;
   const pages: string[] = [];
   for (let i = 1; i <= doc.numPages; i++) {
@@ -19,6 +18,7 @@ async function extractPdf(data: ArrayBuffer): Promise<string> {
 }
 
 async function extractDocx(data: ArrayBuffer): Promise<string> {
+  const { default: mammoth } = await import("mammoth");
   const result = await mammoth.extractRawText({ arrayBuffer: data });
   return result.value;
 }

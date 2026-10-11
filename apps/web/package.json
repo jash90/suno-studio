@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.90",
+    "@sentry/react": "^11.6.0",
     "@suno/backend": "*",
     "@suno/core": "*",
     "@tauri-apps/plugin-dialog": "~2.7.1",
