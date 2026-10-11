@@ -9,10 +9,15 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "nx": {
     "name": "core",
-    "tags": ["scope:shared", "type:lib"]
+    "tags": [
+      "scope:shared",
+      "type:lib"
+    ],
+    "projectType": "library"
   }
 }

@@ -18,7 +18,8 @@
     "deploy": "cd ../.. && convex deploy",
     "codegen": "cd ../.. && convex codegen",
     "typecheck": "tsc -p convex/tsconfig.json && tsc -p tests/tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.90",
@@ -27,6 +28,10 @@
   },
   "nx": {
     "name": "backend",
-    "tags": ["scope:backend", "type:app"]
+    "tags": [
+      "scope:backend",
+      "type:lib"
+    ],
+    "projectType": "library"
   }
 }

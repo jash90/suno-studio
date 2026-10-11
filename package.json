@@ -16,14 +16,24 @@
     "build:desktop": "nx build desktop",
     "typecheck": "nx run-many -t typecheck",
     "test": "nx run-many -t test",
-    "check": "nx run-many -t typecheck test"
+    "check": "nx run-many -t typecheck lint test",
+    "lint": "nx run-many -t lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
+    "@eslint/js": "^10.0.1",
+    "@nx/eslint-plugin": "^23.3.0",
     "convex": "^1.31.0",
     "convex-test": "^0.0.61",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
     "nx": "^23.3.0",
+    "prettier": "^3.9.10",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
   },
   "engines": {

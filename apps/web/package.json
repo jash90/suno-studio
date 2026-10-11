@@ -10,7 +10,8 @@
     "build:tauri": "tsc -p tsconfig.json && vite build --mode tauri",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.90",
@@ -63,6 +64,7 @@
           "{projectRoot}/dist-tauri"
         ]
       }
-    }
+    },
+    "projectType": "application"
   }
 }

@@ -15,17 +15,28 @@
   },
   "nx": {
     "name": "desktop",
-    "tags": ["scope:frontend", "type:app"],
-    "implicitDependencies": ["web"],
+    "tags": [
+      "scope:frontend",
+      "type:app"
+    ],
+    "implicitDependencies": [
+      "web"
+    ],
     "targets": {
       "build": {
         "dependsOn": [],
-        "outputs": ["{projectRoot}/src-tauri/target/release/bundle"]
+        "outputs": [
+          "{projectRoot}/src-tauri/target/release/bundle"
+        ]
       },
       "typecheck": {
         "cache": true,
-        "inputs": ["{projectRoot}/src-tauri/**/*", "!{projectRoot}/src-tauri/target/**/*"]
+        "inputs": [
+          "{projectRoot}/src-tauri/**/*",
+          "!{projectRoot}/src-tauri/target/**/*"
+        ]
       }
-    }
+    },
+    "projectType": "application"
   }
 }
