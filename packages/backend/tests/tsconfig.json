@@ -4,5 +4,5 @@
     "lib": ["ES2023", "DOM"],
     "types": ["vite/client"]
   },
-  "include": ["."]
+  "include": [".", "../convex/env.d.ts"]
 }

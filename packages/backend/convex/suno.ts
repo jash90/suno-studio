@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { action, ActionCtx, internalAction } from "./_generated/server";
+import { callbacksEnabled, callbackUrl } from "./lib/callback";
 import {
   PersonaModel,
   Provider,
@@ -50,7 +51,8 @@ async function createTask(
   draft: SongDraft,
   model: SunoModel,
   instrumental: boolean,
-  persona?: { id: string; model: PersonaModel }
+  persona: { id: string; model: PersonaModel } | undefined,
+  callBackUrl: string
 ): Promise<string> {
   const data = await sunoFetch<{ taskId: string }>("/generate", sunoKey, {
     method: "POST",
@@ -63,9 +65,8 @@ async function createTask(
       title: draft.title,
       personaId: persona?.id,
       personaModel: persona?.model,
-      // Bez publicznego callbacku — status sprawdzamy pollingiem (scheduler),
-      // ale callBackUrl to wymagane pole, więc podajemy zaślepkę.
-      callBackUrl: "https://example.com/suno-callback",
+      // podpisany URL /suno-callback (lib/callback.ts) albo zaślepka — wtedy sam polling
+      callBackUrl,
     }),
   });
   return data.taskId;
@@ -142,8 +143,10 @@ export async function requireSettings(ctx: ActionCtx, userId: Id<"users">): Prom
   return settings;
 }
 
-const POLL_INTERVAL_MS = 10_000;
-const MAX_ATTEMPTS = 60; // 60 × 10 s = 10 min
+// Z callbackami polling jest tylko siatką bezpieczeństwa — rzadziej. Liczone przy
+// każdym wywołaniu (env Convex zmienia się bez redeployu); limit to zawsze ~10 min.
+const POLL_DEADLINE_MS = 600_000;
+const pollIntervalMs = () => (callbacksEnabled() ? 30_000 : 10_000);
 
 /** Zleca generację w Suno, zapisuje wiersz utworu i uruchamia durable polling. */
 export const startGeneration = action({
@@ -166,12 +169,14 @@ export const startGeneration = action({
     if (!settings.sunoKey) throw new Error("Brak klucza sunoapi.org — uzupełnij w Ustawieniach");
 
     const d = draft as SongDraft;
+    const id = crypto.randomUUID();
     const taskId = await createTask(
       settings.sunoKey,
       d,
       sunoModel as SunoModel,
       instrumental,
-      persona ? { id: persona.id, model: persona.model } : undefined
+      persona ? { id: persona.id, model: persona.model } : undefined,
+      await callbackUrl(userId, id)
     );
     const now = new Date().toISOString();
     const track: Track = {
@@ -180,7 +185,7 @@ export const startGeneration = action({
       personaModel: persona?.model,
       album: albumTitle,
       albumIndex,
-      id: crypto.randomUUID(),
+      id,
       taskId,
       title: d.title,
       style: d.style,
@@ -258,7 +263,8 @@ export const retryGeneration = action({
       { title: track.title, style: track.style, lyrics: track.lyrics },
       track.sunoModel,
       track.instrumental,
-      personaOf(track)
+      personaOf(track),
+      await callbackUrl(userId, domainId)
     );
     await ctx.runMutation(internal.tracks.replaceInternal, {
       userId,
@@ -297,7 +303,8 @@ export const regenerateExpired = action({
         { title: previous.title, style: previous.style, lyrics: previous.lyrics },
         previous.sunoModel,
         previous.instrumental,
-        personaOf(previous)
+        personaOf(previous),
+        await callbackUrl(userId, domainId)
       );
     } catch (e) {
       // Suno nie przyjęło zadania (np. brak kredytów) — przywracamy utwór bez zmian
@@ -317,54 +324,70 @@ export const regenerateExpired = action({
   },
 });
 
-/** Jeden krok durable pollingu: odczyt statusu, patch utworu, ewentualne przeplanowanie. */
+type SyncResult = "done" | "pending" | "skip";
+
+/** Czyta status taska w Suno i zapisuje go na utworze. Przejście w SUCCESS (i plan
+ *  archiwizacji) rozstrzyga mutacja — dokładnie raz, nawet gdy callback i polling
+ *  trafią w ten sam moment. */
+async function syncStatus(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  domainId: string
+): Promise<SyncResult> {
+  const settings = (await ctx.runQuery(internal.settings.getInternal, {
+    userId,
+  })) as Settings | null;
+  const track = (await ctx.runQuery(internal.tracks.getInternal, {
+    userId,
+    domainId,
+  })) as Track | null;
+  if (!track || !settings?.sunoKey) return "skip"; // utwór usunięty albo brak klucza
+  if (track.status === "SUCCESS" || track.status === "FAILED") return "done";
+  const update = await getTaskStatus(settings.sunoKey, track.taskId);
+  const status = await ctx.runMutation(internal.tracks.applyTaskUpdateInternal, {
+    userId,
+    domainId,
+    taskId: track.taskId,
+    update,
+  });
+  return status === "SUCCESS" || status === "FAILED" ? "done" : "pending";
+}
+
+/** Jeden krok durable pollingu: synchronizacja statusu i ewentualne przeplanowanie. */
 export const poll = internalAction({
   args: { userId: v.id("users"), domainId: v.string(), attempt: v.number() },
   handler: async (ctx, { userId, domainId, attempt }) => {
-    const settings = (await ctx.runQuery(internal.settings.getInternal, {
-      userId,
-    })) as Settings | null;
-    const track = (await ctx.runQuery(internal.tracks.getInternal, {
-      userId,
-      domainId,
-    })) as Track | null;
-    if (!track || !settings?.sunoKey) return; // utwór usunięty albo brak klucza
-    if (track.status === "SUCCESS" || track.status === "FAILED") return;
-
-    if (attempt >= MAX_ATTEMPTS) {
-      await ctx.runMutation(internal.tracks.patchInternal, {
+    if (attempt * pollIntervalMs() >= POLL_DEADLINE_MS) {
+      await ctx.runMutation(internal.tracks.failIfPendingInternal, {
         userId,
         domainId,
-        patch: { status: "FAILED", error: "Przekroczono czas oczekiwania (10 min)" },
+        error: "Przekroczono czas oczekiwania (10 min)",
       });
       return;
     }
-
     try {
-      const update = await getTaskStatus(settings.sunoKey, track.taskId);
-      await ctx.runMutation(internal.tracks.patchInternal, {
-        userId,
-        domainId,
-        patch: update,
-      });
-      if (update.status === "SUCCESS") {
-        // Suno kasuje pliki po 14 dniach — od razu kopiujemy je do Convex storage
-        await ctx.scheduler.runAfter(0, internal.archive.archiveTrack, {
-          userId,
-          domainId,
-          attempt: 0,
-        });
-        return;
-      }
-      if (update.status === "FAILED") return;
+      if ((await syncStatus(ctx, userId, domainId)) !== "pending") return;
     } catch {
       // ponytail: chwilowy błąd sieci nie przerywa pollingu — próbujemy dalej
     }
-    await ctx.scheduler.runAfter(POLL_INTERVAL_MS, internal.suno.poll, {
+    await ctx.scheduler.runAfter(pollIntervalMs(), internal.suno.poll, {
       userId,
       domainId,
       attempt: attempt + 1,
     });
+  },
+});
+
+/** Wywoływane z /suno-callback: natychmiastowa synchronizacja bez przeplanowania
+ *  (łańcuch pollingu dalej czuwa jako zabezpieczenie). */
+export const refreshFromCallback = internalAction({
+  args: { userId: v.id("users"), domainId: v.string() },
+  handler: async (ctx, { userId, domainId }) => {
+    try {
+      await syncStatus(ctx, userId, domainId);
+    } catch {
+      // polling ponowi
+    }
   },
 });
 

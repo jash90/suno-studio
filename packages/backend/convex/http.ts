@@ -1,11 +1,31 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
+import { verifyCallback } from "./lib/callback";
 
 const http = httpRouter();
 
 // Trasy logowania Convex Auth
 auth.addHttpRoutes(http);
+
+// Callback sunoapi.org: podpisany URL → natychmiastowe odświeżenie statusu utworu.
+// Treść żądania ignorujemy (status czytamy z API Suno); zawsze 200, żeby Suno nie
+// ponawiało w kółko przy nieznanym/usuniętym utworze.
+http.route({
+  path: "/suno-callback",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const target = await verifyCallback(new URL(req.url));
+    if (!target) return new Response("forbidden", { status: 403 });
+    await ctx.scheduler.runAfter(0, internal.suno.refreshFromCallback, {
+      userId: target.userId as Id<"users">,
+      domainId: target.domainId,
+    });
+    return new Response("ok");
+  }),
+});
 
 // Proxy pobierania: klient (inny origin niż CDN Suno) nie może fetchować plików
 // audio/okładek z powodu CORS. httpAction pobiera plik server-side i streamuje go

@@ -1,5 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { canRegenerate, getVariants, Track } from "@suno/core";
@@ -182,6 +183,41 @@ export const listUnarchivedInternal = internalQuery({
       }
     }
     return pending;
+  },
+});
+
+/** Zapisuje status taska Suno. Ignoruje odpowiedź dla starego taska (utwór w
+ *  międzyczasie ponowiono) i już zamknięte utwory; przy przejściu w SUCCESS planuje
+ *  archiwizację plików — w mutacji, więc dokładnie raz. Zwraca bieżący status. */
+export const applyTaskUpdateInternal = internalMutation({
+  args: { userId: v.id("users"), domainId: v.string(), taskId: v.string(), update: v.any() },
+  handler: async (ctx, { userId, domainId, taskId, update }): Promise<string | null> => {
+    const row = await findRow(ctx, userId, domainId);
+    if (!row) return null;
+    const track = row.data as Track;
+    if (track.taskId !== taskId || track.status === "SUCCESS" || track.status === "FAILED") {
+      return track.status;
+    }
+    await ctx.db.patch(row._id, { data: { ...track, ...update } });
+    if (update.status === "SUCCESS") {
+      // Suno kasuje pliki po 14 dniach — od razu kopiujemy je do Convex storage
+      await ctx.scheduler.runAfter(0, internal.archive.archiveTrack, {
+        userId,
+        domainId,
+        attempt: 0,
+      });
+    }
+    return update.status as string;
+  },
+});
+
+export const failIfPendingInternal = internalMutation({
+  args: { userId: v.id("users"), domainId: v.string(), error: v.string() },
+  handler: async (ctx, { userId, domainId, error }) => {
+    const row = await findRow(ctx, userId, domainId);
+    const track = row?.data as Track | undefined;
+    if (!row || !track || track.status === "SUCCESS" || track.status === "FAILED") return;
+    await ctx.db.patch(row._id, { data: { ...track, status: "FAILED", error } });
   },
 });
 
