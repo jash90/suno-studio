@@ -1,0 +1,18 @@
+{
+  "name": "@suno/core",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Czysta logika domenowa Suno Studio: typy, prompty, BM25, parsowanie LLM.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "nx": {
+    "name": "core",
+    "tags": ["scope:shared", "type:lib"]
+  }
+}

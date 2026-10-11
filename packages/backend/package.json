@@ -1,0 +1,32 @@
+{
+  "name": "@suno/backend",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend Convex Suno Studio (baza, akcje, scheduler, auth).",
+  "exports": {
+    "./api": {
+      "types": "./convex/_generated/api.d.ts",
+      "default": "./convex/_generated/api.js"
+    },
+    "./dataModel": {
+      "types": "./convex/_generated/dataModel.d.ts"
+    }
+  },
+  "scripts": {
+    "dev": "cd ../.. && convex dev",
+    "deploy": "cd ../.. && convex deploy",
+    "codegen": "cd ../.. && convex codegen",
+    "typecheck": "tsc -p convex/tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@convex-dev/auth": "^0.0.90",
+    "@suno/core": "*",
+    "convex": "^1.31.0"
+  },
+  "nx": {
+    "name": "backend",
+    "tags": ["scope:backend", "type:app"]
+  }
+}
