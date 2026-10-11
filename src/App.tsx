@@ -164,6 +164,7 @@ function Studio() {
   const writeSongA = useAction(api.generate.generateSongAction);
   const startGenA = useAction(api.suno.startGeneration);
   const retryGenA = useAction(api.suno.retryGeneration);
+  const regenerateA = useAction(api.suno.regenerateExpired);
   const convertWavA = useAction(api.suno.convertToWav);
   const genCoverA = useAction(api.cover.generateTrackCover);
   const genAlbumCoverA = useAction(api.cover.generateAlbumCover);
@@ -401,6 +402,10 @@ function Studio() {
             onRetry={async (id) => {
               await retryGenA({ domainId: id });
               void refreshBalances(); // ponowna generacja zjada kredyty Suno
+            }}
+            onRegenerate={async (id) => {
+              await regenerateA({ domainId: id });
+              void refreshBalances(); // przegenerowanie zjada kredyty Suno
             }}
             onCreatePersona={handleCreatePersona}
             onConvertToWav={(domainId, audioId) => convertWavA({ domainId, audioId })}
