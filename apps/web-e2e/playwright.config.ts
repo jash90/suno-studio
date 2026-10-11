@@ -5,6 +5,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
+  // lokalny backend Convex ma limit 1 s na funkcję — równoległe rejestracje (scrypt)
+  // przy zimnym starcie potrafiły go przekroczyć; w CI jeden worker
+  workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
