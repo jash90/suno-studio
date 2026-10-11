@@ -16,11 +16,13 @@ import {
   AlbumConcept,
   AlbumSong,
   LibraryDoc,
+  sanitizeAlbum,
   Provider,
   Settings,
   SunoModel,
 } from "@suno/core";
 import { generateAlbumConcept, generateSong } from "./lib/llm";
+import { albumSongPatch } from "./validators";
 import { buildContext, retrieveChunks } from "@suno/core";
 
 const GUIDE_QUERY_SUFFIX =
@@ -45,7 +47,7 @@ export const get = query({
 
 /** Ustawia (lub usuwa, gdy null) aktywny album usera. */
 export const set = mutation({
-  args: { album: v.any() },
+  args: { album: v.union(v.null(), v.any()) },
   handler: async (ctx, { album }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Niezalogowany");
@@ -57,13 +59,16 @@ export const set = mutation({
       if (row) await ctx.db.delete(row._id);
       return;
     }
-    if (row) await ctx.db.patch(row._id, { data: album });
-    else await ctx.db.insert("albums", { userId, data: album });
+    // plan pochodzi z LLM — zapisujemy znormalizowany kształt Album
+    const data = sanitizeAlbum(album);
+    if (!data) throw new Error("Nieprawidłowy plan albumu");
+    if (row) await ctx.db.patch(row._id, { data });
+    else await ctx.db.insert("albums", { userId, data });
   },
 });
 
 export const patchSong = mutation({
-  args: { index: v.number(), patch: v.any() },
+  args: { index: v.number(), patch: albumSongPatch },
   handler: async (ctx, { index, patch }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Niezalogowany");

@@ -23,6 +23,7 @@ import type * as personas from "../personas.js";
 import type * as settings from "../settings.js";
 import type * as suno from "../suno.js";
 import type * as tracks from "../tracks.js";
+import type * as validators from "../validators.js";
 
 import type {
   ApiFromModules,
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   suno: typeof suno;
   tracks: typeof tracks;
+  validators: typeof validators;
 }>;
 
 /**

@@ -4,6 +4,7 @@ import { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { canRegenerate, getVariants, Track } from "@suno/core";
 import { findTrackRow, releaseCoverFile } from "./lib/trackRows";
+import { trackClientPatch } from "./validators";
 
 const findRow = findTrackRow;
 
@@ -45,7 +46,7 @@ export const remove = mutation({
 });
 
 export const patch = mutation({
-  args: { domainId: v.string(), patch: v.any() },
+  args: { domainId: v.string(), patch: trackClientPatch },
   handler: async (ctx, { domainId, patch }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Niezalogowany");

@@ -2,7 +2,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { internalQuery, mutation, MutationCtx, query, QueryCtx } from "./_generated/server";
-import { DocKind, LibraryDoc } from "@suno/core";
+import { LibraryDoc } from "@suno/core";
+import { docKind, libraryDoc } from "./validators";
 
 async function readLibrary(ctx: QueryCtx, userId: Id<"users">): Promise<LibraryDoc[]> {
   const rows = await ctx.db
@@ -32,7 +33,7 @@ export const list = query({
 
 /** Dodaje dokument (ekstrakcja tekstu i chunkowanie robi się po stronie klienta). */
 export const add = mutation({
-  args: { doc: v.any() },
+  args: { doc: libraryDoc },
   handler: async (ctx, { doc }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Niezalogowany");
@@ -45,13 +46,13 @@ export const add = mutation({
 });
 
 export const setKind = mutation({
-  args: { domainId: v.string(), kind: v.union(v.literal("content"), v.literal("guide")) },
+  args: { domainId: v.string(), kind: docKind },
   handler: async (ctx, { domainId, kind }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Niezalogowany");
     const row = await findRow(ctx, userId, domainId);
     if (row) {
-      await ctx.db.patch(row._id, { data: { ...row.data, kind: kind as DocKind } });
+      await ctx.db.patch(row._id, { data: { ...row.data, kind } });
     }
   },
 });

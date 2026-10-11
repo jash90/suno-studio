@@ -2,7 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { internalQuery, mutation, query, QueryCtx } from "./_generated/server";
-import { Settings } from "@suno/core";
+import { sanitizeSettings, Settings } from "@suno/core";
 
 async function readSettings(ctx: QueryCtx, userId: Id<"users">): Promise<Settings | null> {
   const row = await ctx.db
@@ -30,8 +30,10 @@ export const save = mutation({
       .query("settings")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
-    if (row) await ctx.db.patch(row._id, { data: settings });
-    else await ctx.db.insert("settings", { userId, data: settings });
+    // tylko znane pola o poprawnym typie — formularz skleja zapisane dane z domyślnymi
+    const data = sanitizeSettings(settings);
+    if (row) await ctx.db.patch(row._id, { data });
+    else await ctx.db.insert("settings", { userId, data });
   },
 });
 

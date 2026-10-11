@@ -1,6 +1,15 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { DEFAULT_SETTINGS, guessDocKind, LibraryDoc, Persona, Settings, Track } from "@suno/core";
+import {
+  DEFAULT_SETTINGS,
+  guessDocKind,
+  LibraryDoc,
+  Persona,
+  sanitizeAlbum,
+  sanitizeSettings,
+  Settings,
+  Track,
+} from "@suno/core";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { mutation, MutationCtx } from "./_generated/server";
@@ -121,8 +130,9 @@ export const importBatch = mutation({
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique();
       // jeden aktywny album per user — nie nadpisujemy tego, nad którym trwa praca
-      if (!current) {
-        await ctx.db.insert("albums", { userId, data: args.album });
+      const album = sanitizeAlbum(args.album);
+      if (!current && album) {
+        await ctx.db.insert("albums", { userId, data: album });
         result.album = true;
       }
     }
@@ -156,7 +166,8 @@ async function importSettings(
     }
   }
   if (!changed) return false;
-  if (row) await ctx.db.patch(row._id, { data: current });
-  else await ctx.db.insert("settings", { userId, data: current });
+  const data = sanitizeSettings(current);
+  if (row) await ctx.db.patch(row._id, { data });
+  else await ctx.db.insert("settings", { userId, data });
   return true;
 }
