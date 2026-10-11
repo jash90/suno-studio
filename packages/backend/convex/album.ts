@@ -149,6 +149,7 @@ export const plan = action({
         )
       : [];
     const guides = retrieveGuides(docs, useLibrary, brief);
+    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "lyrics" });
     return generateAlbumConcept(provider as Provider, settings, brief, songCount, guides);
   },
 });
@@ -203,6 +204,8 @@ export const writeLyrics = action({
         `\nWskazówki stylu tego utworu: ${song.plan.styleHints}` +
         `\nProponowany tytuł: ${song.plan.title}`;
       try {
+        // limit przekroczony → błąd ląduje w statusie tej piosenki (jak każdy inny)
+        await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "lyrics" });
         const context =
           useLibrary && contentDocs.length > 0
             ? buildContext(retrieveChunks(contentDocs, song.plan.brief))

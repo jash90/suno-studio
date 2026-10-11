@@ -1,13 +1,16 @@
 // Pomocniki testów convex-test. Celowo poza convex/ — wszystko w tamtym katalogu
 // Convex bundluje i wdraża jako funkcje.
 import { convexTest } from "convex-test";
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import type { Track } from "@suno/core";
 import schema from "../convex/schema";
 
 export const modules = import.meta.glob("../convex/**/*.ts");
 
 export function setup() {
-  return convexTest(schema, modules);
+  const t = convexTest(schema, modules);
+  rateLimiter.register(t);
+  return t;
 }
 
 export type TestConvex = ReturnType<typeof setup>;

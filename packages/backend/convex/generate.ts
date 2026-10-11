@@ -28,6 +28,7 @@ export const generateSongAction = action({
       userId,
     })) as Settings | null;
     if (!settings) throw new Error("Brak ustawień — uzupełnij klucze API");
+    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "lyrics" });
 
     let context = "";
     let guides = "";

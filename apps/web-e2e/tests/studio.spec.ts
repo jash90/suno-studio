@@ -64,3 +64,41 @@ test("library file upload, kind toggle and removal", async ({ page }) => {
   await row.getByTitle("Usuń z biblioteki").click();
   await expect(row).toHaveCount(0);
 });
+
+test("account: JSON export without keys, then account deletion", async ({ page }) => {
+  const email = await signUp(page);
+  await openTab(page, "Ustawienia");
+  await page.getByPlaceholder("Klucz z panelu api.sunoapi.org").fill("tajny-klucz");
+  await page.getByRole("button", { name: "Zapisz ustawienia" }).click();
+  await expect(page.getByText("Zapisano", { exact: true })).toBeVisible();
+
+  await expect(page.getByText(/Archiwum audio i okładek/)).toBeVisible();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: /Eksport danych/ }).click(),
+  ]);
+  const exported = await download.createReadStream().then(async (stream) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    return Buffer.concat(chunks).toString("utf8");
+  });
+  expect(JSON.parse(exported).format).toBe("suno-studio-export@1");
+  expect(exported).not.toContain("tajny-klucz");
+
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByPlaceholder("USUŃ").fill("USUŃ");
+  await page.getByRole("button", { name: /Usuń konto/ }).click();
+  await expect(page.getByRole("button", { name: "Zaloguj", exact: true })).toBeVisible();
+
+  // konto naprawdę zniknęło — logowanie tym samym e-mailem się nie udaje
+  await page.getByPlaceholder("E-mail").fill(email);
+  await page.getByPlaceholder("Hasło").fill("e2e-password-123");
+  await page.getByRole("button", { name: "Zaloguj", exact: true }).click();
+  await expect(page.locator(".signin .error")).toBeVisible();
+});
+
+test("password reset link is hidden without a configured mail provider", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Zaloguj", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Nie pamiętasz hasła/ })).toHaveCount(0);
+});

@@ -168,6 +168,7 @@ export const startGeneration = action({
     const settings = await requireSettings(ctx, userId);
     if (!settings.sunoKey) throw new Error("Brak klucza sunoapi.org — uzupełnij w Ustawieniach");
 
+    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "music" });
     const d = draft as SongDraft;
     const id = crypto.randomUUID();
     const taskId = await createTask(
@@ -257,6 +258,7 @@ export const retryGeneration = action({
     })) as Track | null;
     if (!track) throw new Error("Nie znaleziono utworu");
     if (track.status !== "FAILED") throw new Error("Ponowić można tylko nieudaną generację");
+    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "music" });
 
     const taskId = await createTask(
       settings.sunoKey,
@@ -290,6 +292,7 @@ export const regenerateExpired = action({
     const settings = await requireSettings(ctx, userId);
     if (!settings.sunoKey) throw new Error("Brak klucza sunoapi.org — uzupełnij w Ustawieniach");
 
+    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "music" });
     // atomowo: sprawdza, że wszystkie warianty przepadły, i ustawia PENDING
     const previous = (await ctx.runMutation(internal.tracks.claimRegenerationInternal, {
       userId,
@@ -406,6 +409,7 @@ export const convertToWav = action({
 
     const existing = track.variants?.find((v) => v.audioId === audioId)?.wavUrl;
     if (existing) return existing;
+    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "wav" });
 
     const url = await runWavConversion(settings.sunoKey, track.taskId, audioId);
     // patch jednego wariantu — równolegle archiwizacja MP3 może zmieniać variants

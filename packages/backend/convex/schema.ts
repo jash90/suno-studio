@@ -34,6 +34,14 @@ export default defineSchema({
     data: v.any(), // Persona
   }).index("by_user", ["userId"]),
 
+  // Dziennik operacji płatnych (limity w limits.ts, podsumowanie w Ustawieniach)
+  usage: defineTable({
+    userId: v.id("users"),
+    kind: v.string(), // UsageKind
+    count: v.number(),
+    at: v.number(),
+  }).index("by_user_at", ["userId", "at"]),
+
   albums: defineTable({
     userId: v.id("users"),
     data: v.any(), // Album (jeden aktywny wiersz per user)

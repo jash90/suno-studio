@@ -5,6 +5,7 @@ import { Id } from "./_generated/dataModel";
 import { action, ActionCtx, internalAction, internalMutation, mutation } from "./_generated/server";
 import { Track } from "@suno/core";
 import { findTrackRow, releaseCoverFile, rowsOfUser } from "./lib/trackRows";
+import { consume } from "./limits";
 import { requireSettings } from "./suno";
 
 // Okładki AI przez OpenAI Images API (gpt-image-1.5) — obok okładek Suno.
@@ -94,6 +95,7 @@ export const generateTrackCover = action({
       domainId,
     })) as Track | null;
     if (!track) throw new Error("Nie znaleziono utworu");
+    await ctx.runMutation(internal.limits.consumeInternal, { userId, kind: "cover" });
     return coverForTrack(ctx, userId, settings.openaiKey, track);
   },
 });
@@ -112,6 +114,7 @@ export const generateAlbumCovers = mutation({
       return t.album === album && t.status === "SUCCESS" && !t.aiImageUrl && !t.coverStatus;
     });
     if (rows.length === 0) throw new Error("Wszystkie utwory albumu mają już okładkę AI");
+    await consume(ctx, userId, "cover", rows.length);
     for (const row of rows) {
       await ctx.db.patch(row._id, {
         data: { ...(row.data as Track), coverStatus: "pending", coverError: undefined },

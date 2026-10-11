@@ -3,6 +3,7 @@ import { Check, Eye, EyeOff } from "lucide-react";
 import { ANTHROPIC_MODELS, OPENAI_MODELS, Provider, Settings, SunoModel } from "@suno/core";
 import { ALBUM_PROMPT_TEMPLATE, SONG_PROMPT_TEMPLATE } from "@suno/core";
 import platform from "@platform";
+import AccountPanel from "../components/AccountPanel";
 import DesktopSettings from "../components/DesktopSettings";
 import LegacyImport from "../components/LegacyImport";
 
@@ -267,6 +268,8 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
           <LegacyImport desktop={platform.desktop} />
         </>
       )}
+
+      <AccountPanel />
     </div>
   );
 }
