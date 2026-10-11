@@ -15,12 +15,10 @@ async function signUp(page: Page) {
 /** Zakładka po nazwie — górny pasek na desktopie, dolny na mobile. */
 async function openTab(page: Page, name: string) {
   const top = page.locator("header nav").getByRole("button", { name: new RegExp(`^${name}`) });
-  if (await top.isVisible()) await top.click();
-  else
-    await page
-      .locator(".bottom-nav")
-      .getByRole("button", { name: new RegExp(name) })
-      .click();
+  const bottom = page.locator(".bottom-nav").getByRole("button", { name: new RegExp(name) });
+  // isVisible() nie czeka — najpierw poczekaj, aż wyrenderuje się którykolwiek pasek
+  await expect(top.or(bottom).first()).toBeVisible();
+  await ((await top.isVisible()) ? top : bottom).click();
 }
 
 test("sign up, navigate tabs and see empty states", async ({ page }) => {
