@@ -8,7 +8,7 @@ import {
   MutationCtx,
   query,
 } from "./_generated/server";
-import { Track } from "../src/types";
+import { canRegenerate, getVariants, Track } from "../src/types";
 
 async function findRow(
   ctx: MutationCtx,
@@ -115,6 +115,26 @@ export const replaceInternal = internalMutation({
   },
 });
 
+/** Atomowo zajmuje utwór do przegenerowania (status PENDING) i zwraca jego stan
+ *  sprzed zmiany — drugie kliknięcie/druga karta nie zleci drugiego taska w Suno. */
+export const claimRegenerationInternal = internalMutation({
+  args: { userId: v.id("users"), domainId: v.string() },
+  handler: async (ctx, { userId, domainId }): Promise<Track> => {
+    const row = await findRow(ctx, userId, domainId);
+    if (!row) throw new Error("Nie znaleziono utworu");
+    const track = row.data as Track;
+    if (!canRegenerate(track)) {
+      throw new Error(
+        track.status === "SUCCESS"
+          ? "Ten utwór ma jeszcze dostępne audio — nie trzeba go przegenerowywać"
+          : "Utwór jest już generowany"
+      );
+    }
+    await ctx.db.patch(row._id, { data: { ...track, status: "PENDING" } });
+    return track;
+  },
+});
+
 /** Ustawia `fields` i usuwa `clear` (opcjonalnie tylko klucze z `only`). */
 function merge<T extends object>(
   obj: T,
@@ -164,7 +184,8 @@ export const listUnarchivedInternal = internalQuery({
     for (const row of rows) {
       const track = row.data as Track;
       if (track.status !== "SUCCESS") continue;
-      const variants = track.variants ?? [];
+      // getVariants: starsze wpisy z polami płaskimi archiveTrack zamieni na wariant A
+      const variants = getVariants(track);
       const audio = variants.some((v) => v.audioUrl && !v.audioStorageId && !v.audioExpired);
       const wavAudioIds = variants
         .filter((v) => v.wavUrl && !v.wavStorageId)

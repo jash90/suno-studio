@@ -25,23 +25,15 @@ import {
   imageExt,
   sanitizeFileName,
 } from "../services/download";
-import { Playback, PlayQueueItem, Track, TrackVariant } from "../types";
-
-/** Warianty utworu; starsze wpisy historii mają tylko pola płaskie — sklejamy z nich wariant A. */
-function getVariants(track: Track): TrackVariant[] {
-  if (track.variants && track.variants.length > 0) return track.variants;
-  if (!track.audioId) return [];
-  return [
-    {
-      audioId: track.audioId,
-      audioUrl: track.audioUrl,
-      streamAudioUrl: track.streamAudioUrl,
-      imageUrl: track.imageUrl,
-      duration: track.duration,
-      wavUrl: track.wavUrl,
-    },
-  ];
-}
+import {
+  canRegenerate,
+  getVariants,
+  isAudioLost,
+  Playback,
+  PlayQueueItem,
+  Track,
+  TrackVariant,
+} from "../types";
 
 const VARIANT_LETTERS = ["A", "B", "C", "D"];
 
@@ -150,7 +142,7 @@ function TrackProgress({ track, now }: { track: Track; now: number }) {
         />
       </div>
       <span className="progress-label">
-        <Loader2 size={13} className="spin" /> {formatElapsed(track.createdAt, now)}
+        <Loader2 size={13} className="spin" /> {formatElapsed(track.generatedAt ?? track.createdAt, now)}
         {" · zwykle 1–3 min"}
       </span>
     </div>
@@ -165,6 +157,7 @@ interface Props {
   onStopPlayback: () => void;
   onDelete: (id: string) => void;
   onRetry: (id: string) => Promise<void>;
+  onRegenerate: (id: string) => Promise<void>;
   onCreatePersona: (
     track: Track,
     audioId: string,
@@ -193,6 +186,7 @@ export default function LibraryView({
   onStopPlayback,
   onDelete,
   onRetry,
+  onRegenerate,
   onCreatePersona,
   onConvertToWav,
   onGenerateCover,
@@ -495,6 +489,8 @@ export default function LibraryView({
             {variant?.audioExpired && (
               <p className="error">
                 Plik audio wygasł na serwerach Suno (trzymają pliki 14 dni), zanim trafił do archiwum.
+                {!canRegenerate(track) && variants.some((v) => !isAudioLost(v)) &&
+                  " Pozostałe pliki tego utworu są dostępne."}
               </p>
             )}
 
@@ -597,6 +593,42 @@ export default function LibraryView({
                     <><Loader2 size={14} className="spin" /> Wysyłanie...</>
                   ) : (
                     <><RotateCcw size={14} /> Generuj ponownie</>
+                  )}
+                </button>
+              )}
+              {canRegenerate(track) && (
+                <button
+                  disabled={retryBusy === track.id}
+                  onClick={async () => {
+                    const personaNote =
+                      track.personaUsed && !track.personaId
+                        ? `\n\nPersona „${track.personaUsed}" nie zostanie użyta — utwór nie ma zapisanego jej id.`
+                        : "";
+                    if (
+                      !window.confirm(
+                        `Suno wygeneruje NOWĄ wersję „${track.title}" z tym samym tekstem, stylem i modelem — ` +
+                          "nagranie będzie inne niż oryginał, którego nie da się odzyskać. " +
+                          "Zużyje to kredyty Suno." +
+                          personaNote
+                      )
+                    )
+                      return;
+                    setMessage(null);
+                    setRetryBusy(track.id);
+                    try {
+                      await onRegenerate(track.id);
+                      setMessage(`„${track.title}" wysłano do Suno do przegenerowania`);
+                    } catch (e) {
+                      setMessage(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setRetryBusy(null);
+                    }
+                  }}
+                >
+                  {retryBusy === track.id ? (
+                    <><Loader2 size={14} className="spin" /> Wysyłanie...</>
+                  ) : (
+                    <><RotateCcw size={14} /> Przegeneruj</>
                   )}
                 </button>
               )}

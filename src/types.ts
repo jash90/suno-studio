@@ -218,6 +218,8 @@ export interface Track {
   error?: string;
   audioId?: string; // id utworu w Suno — potrzebne do utworzenia persony
   personaUsed?: string; // nazwa persony użytej przy generacji
+  personaId?: string; // id i model persony — do przegenerowania z tą samą personą
+  personaModel?: PersonaModel;
   album?: string; // nazwa albumu, jeśli utwór powstał w trybie Album
   albumIndex?: number; // numer utworu na płycie (kolejność z planu albumu)
   wavUrl?: string; // URL po jednorazowej konwersji do WAV
@@ -229,4 +231,35 @@ export interface Track {
   imageUrl?: string;
   duration?: number;
   createdAt: string;
+  // start ostatniej generacji w Suno; createdAt zostaje przy przegenerowaniu,
+  // żeby utwór nie przeskakiwał na górę biblioteki. Brak = createdAt.
+  generatedAt?: string;
+  previousTaskIds?: string[]; // taski Suno sprzed przegenerowań wygasłego audio
+}
+
+/** Warianty utworu; starsze wpisy historii mają tylko pola płaskie — sklejamy z nich wariant A. */
+export function getVariants(track: Track): TrackVariant[] {
+  if (track.variants && track.variants.length > 0) return track.variants;
+  if (!track.audioId) return [];
+  return [
+    {
+      audioId: track.audioId,
+      audioUrl: track.audioUrl,
+      streamAudioUrl: track.streamAudioUrl,
+      imageUrl: track.imageUrl,
+      duration: track.duration,
+      wavUrl: track.wavUrl,
+    },
+  ];
+}
+
+/** Wariant bezpowrotnie stracony: wygasł w Suno i nie ma kopii MP3 ani WAV w storage. */
+export function isAudioLost(variant: TrackVariant): boolean {
+  return !!variant.audioExpired && !variant.audioStorageId && !variant.wavStorageId;
+}
+
+/** Przegenerować można tylko gotowy utwór, którego wszystkie warianty przepadły. */
+export function canRegenerate(track: Track): boolean {
+  const variants = getVariants(track);
+  return track.status === "SUCCESS" && variants.length > 0 && variants.every(isAudioLost);
 }

@@ -5,7 +5,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { ActionCtx, internalAction } from "./_generated/server";
-import { Track } from "../src/types";
+import { getVariants, Track } from "../src/types";
 
 // sunoapi.org: "Generated files are retained for 14 days" — po tym czasie
 // tempfile CDN zwraca 404, a stream 403. Kopiujemy pliki do Convex storage.
@@ -17,11 +17,13 @@ type Fetched = { blob: Blob } | { gone: true } | { retry: true };
 
 /** Pobiera plik z CDN Suno. 403/404 traktujemy jako „wygasł" tylko dla starych
  *  utworów — świeżo po SUCCESS CDN bywa jeszcze niespójny, wtedy ponawiamy. */
-async function fetchSource(url: string, createdAt: string): Promise<Fetched> {
+async function fetchSource(url: string, track: Track): Promise<Fetched> {
   try {
     const res = await fetch(url);
     if (res.ok) return { blob: await res.blob() };
-    const old = Date.now() - new Date(createdAt).getTime() > RETENTION_MS - 24 * 60 * 60 * 1000;
+    // generatedAt: przegenerowany utwór ma stare createdAt, ale świeże pliki
+    const generatedAt = new Date(track.generatedAt ?? track.createdAt).getTime();
+    const old = Date.now() - generatedAt > RETENTION_MS - 24 * 60 * 60 * 1000;
     if (old && [403, 404, 410].includes(res.status)) return { gone: true };
   } catch {
     // chwilowy błąd sieci — ponowimy
@@ -36,8 +38,14 @@ async function store(ctx: ActionCtx, blob: Blob): Promise<{ storageId: string; u
   return { storageId, url };
 }
 
-function loadTrack(ctx: ActionCtx, userId: Id<"users">, domainId: string) {
-  return ctx.runQuery(internal.tracks.getInternal, { userId, domainId }) as Promise<Track | null>;
+/** Wczytuje utwór; starsze wpisy mają tylko pola płaskie — zapisujemy je jako
+ *  wariant A, żeby archiwizacja (i oznaczanie wygasłych) objęła też je. */
+async function loadTrack(ctx: ActionCtx, userId: Id<"users">, domainId: string) {
+  const track = (await ctx.runQuery(internal.tracks.getInternal, { userId, domainId })) as Track | null;
+  if (!track || (track.variants?.length ?? 0) > 0 || !track.audioId) return track;
+  const variants = getVariants(track);
+  await ctx.runMutation(internal.tracks.patchInternal, { userId, domainId, patch: { variants } });
+  return { ...track, variants };
 }
 
 /** Kopiuje MP3 wszystkich wariantów utworu do Convex storage. */
@@ -50,7 +58,7 @@ export const archiveTrack = internalAction({
     let retry = false;
     for (const variant of track.variants ?? []) {
       if (!variant.audioUrl || variant.audioStorageId || variant.audioExpired) continue;
-      const got = await fetchSource(variant.audioUrl, track.createdAt);
+      const got = await fetchSource(variant.audioUrl, track);
       if ("blob" in got) {
         const { storageId, url } = await store(ctx, got.blob);
         await ctx.runMutation(internal.tracks.patchVariantInternal, {
@@ -91,7 +99,7 @@ export const archiveWav = internalAction({
     const variant = track?.variants?.find((x) => x.audioId === audioId);
     if (!track || !variant?.wavUrl || variant.wavStorageId) return;
 
-    const got = await fetchSource(variant.wavUrl, track.createdAt);
+    const got = await fetchSource(variant.wavUrl, track);
     if ("blob" in got) {
       const { storageId, url } = await store(ctx, got.blob);
       await ctx.runMutation(internal.tracks.patchVariantInternal, {
