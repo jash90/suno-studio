@@ -5,23 +5,12 @@ import {
   internalMutation,
   internalQuery,
   mutation,
-  MutationCtx,
   query,
 } from "./_generated/server";
 import { canRegenerate, getVariants, Track } from "@suno/core";
+import { findTrackRow, releaseCoverFile } from "./lib/trackRows";
 
-async function findRow(
-  ctx: MutationCtx,
-  userId: Id<"users">,
-  domainId: string
-) {
-  return ctx.db
-    .query("tracks")
-    .withIndex("by_user_domain", (q) =>
-      q.eq("userId", userId).eq("domainId", domainId)
-    )
-    .unique();
-}
+const findRow = findTrackRow;
 
 export const list = query({
   args: {},
@@ -49,13 +38,17 @@ export const remove = mutation({
     if (!userId) throw new Error("Niezalogowany");
     const row = await findRow(ctx, userId, domainId);
     if (!row) return;
-    // ponytail: aiImageStorageId pomijamy — okładka albumu jest współdzielona przez utwory
-    for (const variant of (row.data as Track).variants ?? []) {
+    const track = row.data as Track;
+    for (const variant of track.variants ?? []) {
       for (const id of [variant.audioStorageId, variant.wavStorageId]) {
         if (id) await ctx.storage.delete(id as Id<"_storage">);
       }
     }
     await ctx.db.delete(row._id);
+    // dawne wspólne okładki albumu: plik kasujemy dopiero, gdy nikt go nie używa
+    if (track.aiImageStorageId) {
+      await releaseCoverFile(ctx, userId, track.aiImageStorageId, [domainId]);
+    }
   },
 });
 

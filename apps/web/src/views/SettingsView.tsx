@@ -8,6 +8,8 @@ import {
   SunoModel,
 } from "@suno/core";
 import { ALBUM_PROMPT_TEMPLATE, SONG_PROMPT_TEMPLATE } from "@suno/core";
+import platform from "@platform";
+import DesktopSettings from "../components/DesktopSettings";
 
 /** Select z listą modeli; zachowuje bieżącą wartość spoza listy jako dodatkową opcję. */
 function ModelSelect({
@@ -259,6 +261,8 @@ export default function SettingsView({ settings, onSave, onCheckCredits }: Props
       </div>
       {saved && <p className="info"><Check size={14} /> Zapisano</p>}
       {credits && <p className="info">{credits}</p>}
+
+      {platform.desktop && <DesktopSettings desktop={platform.desktop} />}
     </div>
   );
 }

@@ -24,7 +24,7 @@ import BalanceBar from "./components/BalanceBar";
 import AlbumView from "./views/AlbumView";
 import CreateView from "./views/CreateView";
 import FilesView from "./views/FilesView";
-import LibraryView from "./views/LibraryView";
+import LibraryView from "./views/library/LibraryView";
 import PlayerView from "./views/PlayerView";
 import SettingsView from "./views/SettingsView";
 import {
@@ -167,7 +167,8 @@ function Studio() {
   const regenerateA = useAction(api.suno.regenerateExpired);
   const convertWavA = useAction(api.suno.convertToWav);
   const genCoverA = useAction(api.cover.generateTrackCover);
-  const genAlbumCoverA = useAction(api.cover.generateAlbumCover);
+  const genAlbumCoversM = useMutation(api.cover.generateAlbumCovers);
+  const resetCoversM = useMutation(api.cover.reset);
   const createPersonaA = useAction(api.suno.createPersona);
   const getCreditsA = useAction(api.suno.getCredits);
   const planAlbumA = useAction(api.album.plan);
@@ -412,9 +413,8 @@ function Studio() {
             onGenerateCover={async (id) => {
               await genCoverA({ domainId: id });
             }}
-            onGenerateAlbumCover={async (name) => {
-              await genAlbumCoverA({ album: name });
-            }}
+            onGenerateAlbumCovers={(name) => genAlbumCoversM({ album: name })}
+            onResetCovers={(ids) => resetCoversM({ domainIds: ids })}
             onSetCoverSource={async (ids, source) => {
               for (const id of ids) {
                 await patchTrackM({ domainId: id, patch: { coverSource: source } });

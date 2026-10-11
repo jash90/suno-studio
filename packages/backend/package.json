@@ -17,7 +17,7 @@
     "dev": "cd ../.. && convex dev",
     "deploy": "cd ../.. && convex deploy",
     "codegen": "cd ../.. && convex codegen",
-    "typecheck": "tsc -p convex/tsconfig.json",
+    "typecheck": "tsc -p convex/tsconfig.json && tsc -p tests/tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {

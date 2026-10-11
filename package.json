@@ -19,7 +19,9 @@
     "check": "nx run-many -t typecheck test"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "convex": "^1.31.0",
+    "convex-test": "^0.0.61",
     "nx": "^23.3.0",
     "typescript": "~5.8.3",
     "vitest": "^5.0.3"

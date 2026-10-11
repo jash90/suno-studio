@@ -1,8 +1,16 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { action, ActionCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import {
+  action,
+  ActionCtx,
+  internalAction,
+  internalMutation,
+  mutation,
+} from "./_generated/server";
 import { Track } from "@suno/core";
+import { findTrackRow, releaseCoverFile, rowsOfUser } from "./lib/trackRows";
 import { requireSettings } from "./suno";
 
 // Okładki AI przez OpenAI Images API (gpt-image-1.5) — obok okładek Suno.
@@ -22,17 +30,6 @@ function coverPrompt(title: string, style: string, lyrics?: string): string {
       ? `Mood, themes and imagery inspired by these lyrics: ${fragment}. `
       : "") +
     `Square professional album cover, striking composition, no text, no words, no letters, no typography.`
-  );
-}
-
-/** Prompt jednej wspólnej okładki albumu. */
-function albumCoverPrompt(albumName: string, tracks: Track[]): string {
-  const styles = [...new Set(tracks.map((t) => t.style))].join("; ").slice(0, 600);
-  const titles = tracks.map((t) => t.title).join(", ").slice(0, 300);
-  return (
-    `Album cover artwork for a music album titled "${albumName}". ` +
-    `Track titles: ${titles}. Musical styles across the album: ${styles}. ` +
-    `One cohesive square professional album cover, striking composition, no text, no words, no letters, no typography.`
   );
 }
 
@@ -63,8 +60,6 @@ async function generateImage(openaiKey: string, prompt: string): Promise<Blob> {
 }
 
 /** Zapisuje obraz do Convex storage i zwraca { url, storageId }. */
-// ponytail: stare pliki storage nie są sprzątane przy regeneracji — storageId
-// jest zapisywany na tracku, więc sprzątanie da się dodać później.
 async function storeImage(
   ctx: ActionCtx,
   blob: Blob
@@ -73,6 +68,28 @@ async function storeImage(
   const url = await ctx.storage.getUrl(storageId);
   if (!url) throw new Error("Nie udało się zapisać okładki");
   return { url, storageId };
+}
+
+/** Okładka AI dla utworu: generacja, zapis w storage, podmiana na tracku.
+ *  Poprzedni plik AI kasujemy dopiero po udanym zapisie nowego. */
+async function coverForTrack(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  openaiKey: string,
+  track: Track
+): Promise<string> {
+  const blob = await generateImage(
+    openaiKey,
+    coverPrompt(track.title, track.style, track.instrumental ? undefined : track.lyrics)
+  );
+  const { url, storageId } = await storeImage(ctx, blob);
+  await ctx.runMutation(internal.cover.setTrackCoverInternal, {
+    userId,
+    domainId: track.id,
+    aiImageUrl: url,
+    aiImageStorageId: storageId,
+  });
+  return url;
 }
 
 /** Generuje okładkę AI dla utworu i zapisuje ją na tracku (coverSource: "ai"). */
@@ -88,44 +105,111 @@ export const generateTrackCover = action({
       domainId,
     })) as Track | null;
     if (!track) throw new Error("Nie znaleziono utworu");
-
-    const blob = await generateImage(
-      settings.openaiKey,
-      coverPrompt(track.title, track.style, track.instrumental ? undefined : track.lyrics)
-    );
-    const { url, storageId } = await storeImage(ctx, blob);
-    await ctx.runMutation(internal.tracks.patchInternal, {
-      userId,
-      domainId,
-      patch: { aiImageUrl: url, aiImageStorageId: storageId, coverSource: "ai" },
-    });
-    return url;
+    return coverForTrack(ctx, userId, settings.openaiKey, track);
   },
 });
 
-/** Generuje jedną wspólną okładkę AI dla albumu i zapisuje ją na każdym tracku. */
-export const generateAlbumCover = action({
+/** Dogenerowuje brakujące okładki AI albumu — osobną dla każdego utworu.
+ *  Każda okładka to osobne zadanie schedulera (generacja trwa 20–60 s, cały album
+ *  w jednej akcji przekraczałby limit czasu); postęp widać reaktywnie po polu
+ *  coverStatus na trackach. Zwraca liczbę zleconych okładek. */
+export const generateAlbumCovers = mutation({
   args: { album: v.string() },
-  handler: async (ctx, { album }): Promise<string> => {
+  handler: async (ctx, { album }): Promise<number> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Niezalogowany");
-    const settings = await requireSettings(ctx, userId);
-    if (!settings.openaiKey) throw new Error("Brak klucza OpenAI — uzupełnij w Ustawieniach");
-    const tracks = (await ctx.runQuery(internal.tracks.listByAlbumInternal, {
-      userId,
-      album,
-    })) as Track[];
-    if (tracks.length === 0) throw new Error("Nie znaleziono utworów albumu");
-
-    const blob = await generateImage(settings.openaiKey, albumCoverPrompt(album, tracks));
-    const { url, storageId } = await storeImage(ctx, blob);
-    for (const t of tracks) {
-      await ctx.runMutation(internal.tracks.patchInternal, {
+    const rows = (await rowsOfUser(ctx, userId)).filter((r) => {
+      const t = r.data as Track;
+      return t.album === album && t.status === "SUCCESS" && !t.aiImageUrl && !t.coverStatus;
+    });
+    if (rows.length === 0) throw new Error("Wszystkie utwory albumu mają już okładkę AI");
+    for (const row of rows) {
+      await ctx.db.patch(row._id, {
+        data: { ...(row.data as Track), coverStatus: "pending", coverError: undefined },
+      });
+      await ctx.scheduler.runAfter(0, internal.cover.generateQueuedCover, {
         userId,
-        domainId: t.id,
-        patch: { aiImageUrl: url, aiImageStorageId: storageId, coverSource: "ai" },
+        domainId: row.domainId,
       });
     }
-    return url;
+    return rows.length;
+  },
+});
+
+export const generateQueuedCover = internalAction({
+  args: { userId: v.id("users"), domainId: v.string() },
+  handler: async (ctx, { userId, domainId }) => {
+    const track = (await ctx.runQuery(internal.tracks.getInternal, {
+      userId,
+      domainId,
+    })) as Track | null;
+    // reset okładek albumu zdążył zdjąć kolejkę — nie generujemy (i nie płacimy)
+    if (!track || track.coverStatus !== "pending") return;
+    try {
+      const settings = await requireSettings(ctx, userId);
+      if (!settings.openaiKey) throw new Error("Brak klucza OpenAI — uzupełnij w Ustawieniach");
+      await coverForTrack(ctx, userId, settings.openaiKey, track);
+    } catch (e) {
+      await ctx.runMutation(internal.tracks.patchInternal, {
+        userId,
+        domainId,
+        patch: { coverStatus: "error", coverError: e instanceof Error ? e.message : String(e) },
+      });
+    }
+  },
+});
+
+export const setTrackCoverInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    domainId: v.string(),
+    aiImageUrl: v.string(),
+    aiImageStorageId: v.string(),
+  },
+  handler: async (ctx, { userId, domainId, aiImageUrl, aiImageStorageId }) => {
+    const row = await findTrackRow(ctx, userId, domainId);
+    if (!row) {
+      await ctx.storage.delete(aiImageStorageId as Id<"_storage">);
+      return;
+    }
+    const track = row.data as Track;
+    const { coverStatus: _s, coverError: _e, ...rest } = track;
+    await ctx.db.patch(row._id, {
+      data: { ...rest, aiImageUrl, aiImageStorageId, coverSource: "ai" },
+    });
+    if (track.aiImageStorageId && track.aiImageStorageId !== aiImageStorageId) {
+      await releaseCoverFile(ctx, userId, track.aiImageStorageId, []);
+    }
+  },
+});
+
+/** Usuwa okładki AI wskazanych utworów (pliki ze storage + pola na trackach). */
+export const reset = mutation({
+  args: { domainIds: v.array(v.string()) },
+  handler: async (ctx, { domainIds }): Promise<number> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Niezalogowany");
+    const files = new Set<string>();
+    let count = 0;
+    for (const domainId of domainIds) {
+      const row = await findTrackRow(ctx, userId, domainId);
+      if (!row) continue;
+      const track = row.data as Track;
+      if (!track.aiImageUrl && !track.coverStatus) continue;
+      if (track.aiImageStorageId) files.add(track.aiImageStorageId);
+      const {
+        aiImageUrl: _u,
+        aiImageStorageId: _id,
+        coverSource: _src,
+        coverStatus: _s,
+        coverError: _e,
+        ...rest
+      } = track;
+      await ctx.db.patch(row._id, { data: rest });
+      count++;
+    }
+    if (count === 0) throw new Error("Brak okładek AI do zresetowania");
+    for (const storageId of files) await releaseCoverFile(ctx, userId, storageId, domainIds);
+    return count;
   },
 });

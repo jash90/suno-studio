@@ -226,6 +226,8 @@ export interface Track {
   aiImageUrl?: string; // okładka wygenerowana przez OpenAI (Convex storage)
   aiImageStorageId?: string; // Id pliku w Convex storage (do ew. sprzątania)
   coverSource?: "suno" | "ai"; // która okładka jest aktywna; undefined = suno
+  coverStatus?: "pending" | "error"; // okładka AI w kolejce generacji (album) / błąd
+  coverError?: string;
   audioUrl?: string;
   streamAudioUrl?: string;
   imageUrl?: string;
