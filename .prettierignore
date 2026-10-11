@@ -8,3 +8,6 @@ package-lock.json
 .nx
 .playwright-mcp
 *.md
+.convex
+playwright-report
+test-results

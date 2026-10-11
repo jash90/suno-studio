@@ -41,6 +41,9 @@ vi.mock("@tauri-apps/plugin-store", () => ({
   }),
 }));
 
+vi.mock("@tauri-apps/plugin-updater", () => ({ check: vi.fn(async () => null) }));
+vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: vi.fn() }));
+
 const { default: platform } = await import("./tauri");
 const text = (path: string) => new TextDecoder().decode(files.get(path));
 

@@ -1,7 +1,9 @@
 import { confirm as askConfirm, open, save } from "@tauri-apps/plugin-dialog";
 import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { load, Store } from "@tauri-apps/plugin-store";
+import { check } from "@tauri-apps/plugin-updater";
 import { sanitizeFileName } from "@suno/core";
 import { withBusy } from "./busy";
 import type { BundleFile, LegacyDesktopData, Platform } from "./types";
@@ -44,6 +46,25 @@ function extension(name: string): string {
   return name.split(".").pop() ?? "";
 }
 
+/** Sprawdza GitHub Releases; po zgodzie użytkownika instaluje i restartuje aplikację.
+ *  Brak sieci / brak wydań nie przeszkadza w pracy — błąd tylko w konsoli. */
+async function checkForUpdate() {
+  try {
+    const update = await check();
+    if (!update) return;
+    const ok = await askConfirm(
+      `Dostępna jest nowa wersja Suno Studio (${update.version}). Zainstalować teraz?` +
+        (update.body ? `\n\n${update.body}` : ""),
+      { title: "Aktualizacja", kind: "info" }
+    );
+    if (!ok) return;
+    await update.downloadAndInstall();
+    await relaunch();
+  } catch (e) {
+    console.warn("Sprawdzanie aktualizacji nie powiodło się:", e);
+  }
+}
+
 async function readJson<T>(file: string, key: string): Promise<T | undefined> {
   return (await load(file)).get<T>(key);
 }
@@ -51,7 +72,9 @@ async function readJson<T>(file: string, key: string): Promise<T | undefined> {
 const tauriPlatform: Platform = {
   kind: "desktop",
 
-  init() {},
+  init() {
+    if (import.meta.env.PROD) void checkForUpdate();
+  },
 
   setAuthToken() {
     // plugin-http nie potrzebuje proxy Convex — token zbędny
