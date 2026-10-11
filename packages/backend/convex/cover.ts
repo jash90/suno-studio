@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { action, ActionCtx, internalAction, internalMutation, mutation } from "./_generated/server";
 import { Track } from "@suno/core";
@@ -203,5 +203,16 @@ export const reset = mutation({
     if (count === 0) throw new Error("Brak okładek AI do zresetowania");
     for (const storageId of files) await releaseCoverFile(ctx, userId, storageId, domainIds);
     return count;
+  },
+});
+
+/** @deprecated Zgodność ze starym frontendem z cache PWA (wołał akcję z jedną wspólną
+ *  okładką albumu). Kieruje do kolejki okładek per utwór. Usunąć, gdy stare karty
+ *  się zaktualizują. */
+export const generateAlbumCover = action({
+  args: { album: v.string() },
+  handler: async (ctx, { album }): Promise<string> => {
+    await ctx.runMutation(api.cover.generateAlbumCovers, { album });
+    return "";
   },
 });
